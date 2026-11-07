@@ -266,15 +266,15 @@ Item {
             }
             var bend = curve(far0, far1, far2, far3, 0.86)
             var span = H * 0.034
-            // The fold of the shoulder: from the skyline down across the road's
-            // last stretch, curving as the hill rounds away from us.
-            var foldTop = { x: bend.x + W * 0.022, y: ridgeY(bend.x + W * 0.022) + 1 }
-            var fold0 = { x: bend.x + W * 0.012, y: bend.y - span }
-            var fold1 = { x: bend.x - W * 0.004, y: bend.y - span * 0.4 }
-            var fold2 = { x: bend.x - W * 0.002, y: bend.y + span * 0.2 }
-            var fold3 = { x: bend.x + W * 0.006, y: bend.y + span * 0.55 }
+            // The edge of the shoulder: a rounded hill seen from here shows a
+            // convex edge, bulging toward us, from the skyline down across the
+            // road's last stretch. The road wraps round the outside of it and
+            // passes out of sight behind.
+            var foldTop = { x: bend.x - W * 0.004, y: ridgeY(bend.x - W * 0.004) + 1 }
+            var fold3 = { x: bend.x - W * 0.008, y: bend.y + span * 0.6 }
+            var fold1 = { x: bend.x + W * 0.03, y: foldTop.y + (fold3.y - foldTop.y) * 0.3 }
+            var fold2 = { x: bend.x + W * 0.03, y: foldTop.y + (fold3.y - foldTop.y) * 0.78 }
             function traceFold() {
-                ctx.lineTo(fold0.x, fold0.y)
                 ctx.bezierCurveTo(fold1.x, fold1.y, fold2.x, fold2.y, fold3.x, fold3.y)
             }
 

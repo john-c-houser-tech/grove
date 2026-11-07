@@ -163,9 +163,11 @@ Item {
         carColor: Qt.darker(look.midColor, 2.2)
         floorColor: look.floorColor
         ballastColor: Qt.darker(look.floorColor, 1.35)
-        roadColor: Qt.tint(look.floorColor, Qt.rgba(0.62, 0.55, 0.42, 0.45))
-        cutColor: Qt.tint(look.midColor, Qt.rgba(0.62, 0.5, 0.34, 0.6))
-        fillColor: Qt.darker(Qt.tint(look.midColor, Qt.rgba(0.5, 0.42, 0.3, 0.5)), 1.1)
+        // Asphalt, lit like everything else.
+        roadColor: look.lit("#4c4f54", 0.1)
+        // Bare earth in the cut and the tipped fill below the road, lit like the land.
+        cutColor: look.lit("#9a8160", 0.22)
+        fillColor: look.lit("#6f5f47", 0.22)
         hillColor: look.midColor
         hazeColor: light.skyBottom
         railColor: Qt.tint(look.floorColor, Qt.rgba(light.skyBottom.r, light.skyBottom.g, light.skyBottom.b, 0.55))
