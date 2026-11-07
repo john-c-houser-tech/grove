@@ -1,0 +1,12 @@
+# Valgrind suppressions for bin/check-leaks. Each is something outside
+# Grove that Valgrind reports wrongly; nothing of Grove's is suppressed.
+
+# Qt hashes strings with AES instructions, 16 bytes at a time, and so reads
+# up to 15 bytes past the end of a short string. It never crosses into the
+# next page, so the read is safe, but Valgrind sees it as invalid.
+{
+   qt-aeshash-reads-whole-blocks
+   Memcheck:Addr16
+   ...
+   fun:*aeshash128*
+}

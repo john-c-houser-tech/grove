@@ -9,7 +9,7 @@ draw and easy to read, and tools check as many of them as they can.
 |---------|----------------|
 | `bin/lint` | Formatting (`.clang-format`); compiler warnings as errors (`-Wall -Wextra -Wpedantic -Wshadow -Werror`); `clang-tidy` (`.clang-tidy`); `qmllint` against the Grove module, with no warning allowed; every translation catalog complete. |
 | `bin/test` | The unit tests, and the scene tests: the whole app drawn offscreen and driven by keys, where any QML warning fails. |
-| `bin/check-leaks` | Both test programs under AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer, with no suppressions, and a soak test that fails if the heap keeps rising. `--canary` plants a leak and kept memory, and passes only if both are caught. |
+| `bin/check-leaks` | Both test programs under AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer, with no suppressions; then under Valgrind, when it is installed, with one suppression for a Qt read it misreports (`tests/valgrind.supp`); and a soak test that fails if the heap keeps rising. `--canary` plants a leak and kept memory, and passes only if every part catches them. |
 | `bin/check` | All three. |
 
 The pre-commit hook in `githooks/` runs `bin/lint` and `bin/test`; enable it
