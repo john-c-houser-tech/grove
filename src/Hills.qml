@@ -53,10 +53,14 @@ Canvas {
     // of the way across.
     function far(u, H) {
         var v = 0.55 * ridged(u * 2.4 + 3, 1) + 0.3 * ridged(u * 5.3 + 9, 2) + 0.15 * ridged(u * 11.7 + 4, 3)
-        return H * (0.05 + 0.5 * Math.pow(v, 0.9))
+        return H * (0.04 + 0.3 * Math.pow(v, 0.9))
     }
     function mid(u, H) {
+        // A shoulder of hill rises behind the level crossing, so the road
+        // beyond the rails has a slope to climb into.
+        var shoulder = (u - 0.6) / 0.12
         return H * (0.035 + 0.15 * noise(u * 2.6 + 5, 4)) + H * 0.025 * noise(u * 8.2, 5)
+               + H * 0.07 * Math.exp(-shoulder * shoulder)
     }
     function near(u, H) {
         // Two hills, one at each edge, with a low meadow between them. The
@@ -97,7 +101,7 @@ Canvas {
         }
 
         // Far peaks, with snow above a ragged snowline.
-        paintRidge(ctx, far, H * 0.5, 0, farColor, 0.55)
+        paintRidge(ctx, far, H * 0.34, 0, farColor, 0.55)
         ctx.save()
         ctx.beginPath()
         ctx.moveTo(0, H)
@@ -106,7 +110,7 @@ Canvas {
         ctx.lineTo(W, H)
         ctx.closePath()
         ctx.clip()
-        var snowY = y0 - H * 0.5 * snowline
+        var snowY = y0 - H * 0.34 * snowline
         ctx.beginPath()
         ctx.moveTo(0, 0)
         ctx.lineTo(W, 0)
@@ -117,7 +121,7 @@ Canvas {
             ctx.lineTo(sx, snowY + wobble)
         }
         ctx.closePath()
-        var cap = ctx.createLinearGradient(0, y0 - H * 0.5, 0, snowY)
+        var cap = ctx.createLinearGradient(0, y0 - H * 0.34, 0, snowY)
         cap.addColorStop(0, snowColor)
         cap.addColorStop(1, mix(snowColor, farColor, 0.35))
         ctx.fillStyle = cap

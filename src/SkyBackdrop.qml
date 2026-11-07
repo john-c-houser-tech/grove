@@ -6,7 +6,8 @@ Item {
     id: root
 
     // Where the horizon sits, as a fraction of the height.
-    property real horizon: 0.88
+    // At standing eye level: everything below is ground, everything above sky.
+    property real horizon: 0.6
 
     Rectangle {
         anchors.fill: parent
@@ -47,7 +48,7 @@ Item {
         opacity: Math.max(0.05, 1 - 0.55 * weather.cloud - 0.5 * weather.fog)
         readonly property real size: Math.min(root.width, root.height) * 0.07
         x: root.width * (0.08 + 0.84 * light.sunX) - width / 2
-        y: root.height * (root.horizon - 0.66 * light.elevation) - height / 2
+        y: root.height * (root.horizon - 0.5 * light.elevation) - height / 2
         width: size
         height: size
         Rectangle {
@@ -78,7 +79,7 @@ Item {
         visible: !light.sunUp
         readonly property real size: Math.min(root.width, root.height) * 0.055
         x: root.width * (0.08 + 0.84 * light.moonX) - width / 2
-        y: root.height * (root.horizon - 0.62 * light.moonElevation) - height / 2
+        y: root.height * (root.horizon - 0.48 * light.moonElevation) - height / 2
         width: size
         height: size
         opacity: Math.min(1, 0.25 + light.stars) * Math.max(0.05, 1 - 0.7 * weather.cloud - 0.5 * weather.fog)
@@ -163,6 +164,7 @@ Item {
         floorColor: look.floorColor
         ballastColor: Qt.darker(look.floorColor, 1.35)
         roadColor: Qt.tint(look.floorColor, Qt.rgba(0.62, 0.55, 0.42, 0.45))
+        cutColor: Qt.darker(Qt.tint(look.midColor, Qt.rgba(0.45, 0.36, 0.25, 0.55)), 1.15)
         railColor: Qt.tint(look.floorColor, Qt.rgba(light.skyBottom.r, light.skyBottom.g, light.skyBottom.b, 0.55))
     }
     Connections {

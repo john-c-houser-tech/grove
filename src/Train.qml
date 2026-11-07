@@ -21,9 +21,11 @@ Item {
     property color ballastColor: "#26382d"
     property color railColor: "#6d7f78"
     property color roadColor: "#7a7258"
+    // The bare earth of the cut the road climbs into beyond the crossing.
+    property color cutColor: "#4a4232"
 
     // The crossing stands a little right of the middle, clear of the plant.
-    readonly property real crossingX: 0.63
+    readonly property real crossingX: 0.68
     readonly property real seconds: progress * totalMilliseconds / 1000
     readonly property real atCrossing: 26
     // Everything on the railway is drawn to one scale, in metres, so the train
@@ -105,6 +107,7 @@ Item {
             function onBallastColorChanged() { bed.requestPaint() }
             function onRailColorChanged() { bed.requestPaint() }
             function onRoadColorChanged() { bed.requestPaint() }
+            function onCutColorChanged() { bed.requestPaint() }
         }
         onPaint: {
             var ctx = getContext("2d")
@@ -123,53 +126,73 @@ Item {
             ctx.closePath()
             ctx.fillStyle = root.floorColor
             ctx.fill()
-            // A dirt road. Beyond the rails it runs off into the distance; on
-            // this side it comes a little toward us, then curves away to the
-            // right along the valley floor and goes behind the hill there. The
-            // signal stands on its right-hand verge.
+            // A dirt road. On this side it comes a little toward us, then curves
+            // away to the right along the valley floor and goes behind the hill
+            // there. Beyond the rails it climbs the hillside to the left, where
+            // the hill is higher, and goes into a cut in the slope. The signal
+            // stands on its right-hand verge.
             var post = W * root.crossingX, cy = root.trackY(root.crossingX)
             var gap = H * 0.006, crossing = H * 0.05
             var centre = post - gap - crossing / 2
-            ctx.fillStyle = root.roadColor
-            ctx.beginPath()
-            ctx.moveTo(centre - crossing * 0.1 - H * 0.004, cy - H * 0.022)
-            ctx.lineTo(centre - crossing * 0.1 + H * 0.004, cy - H * 0.022)
-            ctx.lineTo(centre + crossing / 2, cy)
-            ctx.lineTo(centre - crossing / 2, cy)
-            ctx.closePath()
-            ctx.fill()
-            // The near side as a band along a curve: wide where it crosses the
-            // line square on, and thin where it turns to run across our view.
-            function bend(t) {
+
+            function curve(p0, p1, p2, p3, t) {
                 var u = 1 - t
-                var p0 = { x: centre, y: cy }, p1 = { x: centre, y: cy + H * 0.03 }
-                var p2 = { x: centre + W * 0.1, y: cy + H * 0.034 }, p3 = { x: W * 1.08, y: cy + H * 0.028 }
                 return {
                     x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
                     y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
                 }
             }
-            var upper = [], lower = []
-            for (var i = 0; i <= 40; i++) {
-                var t = i / 40
-                var at = bend(t), next = bend(Math.min(1, t + 0.01)), prev = bend(Math.max(0, t - 0.01))
-                var dx = next.x - prev.x, dy = next.y - prev.y, len = Math.sqrt(dx * dx + dy * dy) || 1
-                // Seen from low down, a road running across the view is mostly
-                // foreshortened away; the squarer it runs toward us, the wider.
-                var across = Math.abs(dy) / len
-                var half = H * (0.006 + 0.019 * across)
-                var nx = -dy / len, ny = dx / len
-                // Toward us the road is wide side to side; running across, it is
-                // thin top to bottom.
-                upper.push({ x: at.x + nx * half, y: at.y + ny * half * (1 - across) - (1 - across) * half * 0.2 })
-                lower.push({ x: at.x - nx * half, y: at.y - ny * half * (1 - across) + (1 - across) * half * 0.2 })
+            // A road along a curve, seen from low down: as wide as the crossing
+            // where it runs straight toward or away from us, thin where it turns
+            // to run across the view, and narrower with distance (farther).
+            function road(p0, p1, p2, p3, farther) {
+                var upper = [], lower = []
+                for (var i = 0; i <= 40; i++) {
+                    var t = i / 40
+                    var at = curve(p0, p1, p2, p3, t)
+                    var next = curve(p0, p1, p2, p3, Math.min(1, t + 0.01)), prev = curve(p0, p1, p2, p3, Math.max(0, t - 0.01))
+                    var dx = next.x - prev.x, dy = next.y - prev.y, len = Math.sqrt(dx * dx + dy * dy) || 1
+                    var toward = Math.abs(dy) / len
+                    var shrink = 1 - farther * t
+                    var half = H * (0.006 + 0.019 * toward) * shrink
+                    var nx = -dy / len, ny = dx / len
+                    upper.push({ x: at.x + nx * half, y: at.y + ny * half * (1 - toward) - (1 - toward) * half * 0.2 })
+                    lower.push({ x: at.x - nx * half, y: at.y - ny * half * (1 - toward) + (1 - toward) * half * 0.2 })
+                }
+                ctx.beginPath()
+                ctx.moveTo(upper[0].x, upper[0].y)
+                for (var a = 1; a < upper.length; a++)
+                    ctx.lineTo(upper[a].x, upper[a].y)
+                for (var b = lower.length - 1; b >= 0; b--)
+                    ctx.lineTo(lower[b].x, lower[b].y)
+                ctx.closePath()
+                ctx.fill()
+                return upper
             }
+
+            ctx.fillStyle = root.roadColor
+            // Near side.
+            road({ x: centre, y: cy }, { x: centre, y: cy + H * 0.03 },
+                 { x: centre + W * 0.1, y: cy + H * 0.034 }, { x: W * 1.08, y: cy + H * 0.028 }, 0)
+            // Far side: straight away from the rails at first, then turning up
+            // the slope to the left, getting narrower as it goes.
+            var far0 = { x: centre, y: cy }, far1 = { x: centre - W * 0.004, y: cy - H * 0.012 }
+            var far2 = { x: centre - W * 0.07, y: cy - H * 0.014 }, far3 = { x: centre - W * 0.14, y: cy - H * 0.03 }
+            var bank = road(far0, far1, far2, far3, 0.65)
+            // The cut: a bank of bare earth on the uphill side of the road over
+            // its last stretch, which the road runs in under and out of sight.
+            ctx.fillStyle = root.cutColor
             ctx.beginPath()
-            ctx.moveTo(upper[0].x, upper[0].y)
-            for (var a = 1; a < upper.length; a++)
-                ctx.lineTo(upper[a].x, upper[a].y)
-            for (var b = lower.length - 1; b >= 0; b--)
-                ctx.lineTo(lower[b].x, lower[b].y)
+            var startCut = Math.floor(bank.length * 0.55)
+            ctx.moveTo(bank[startCut].x, bank[startCut].y)
+            for (var e = startCut + 1; e < bank.length; e++) {
+                var rise = H * 0.009 * (e - startCut) / (bank.length - startCut)
+                ctx.lineTo(bank[e].x, bank[e].y - rise)
+            }
+            var endPoint = curve(far0, far1, far2, far3, 1)
+            ctx.lineTo(endPoint.x - W * 0.012, endPoint.y + H * 0.002)
+            for (var f = bank.length - 1; f >= startCut; f--)
+                ctx.lineTo(bank[f].x, bank[f].y + H * 0.0005)
             ctx.closePath()
             ctx.fill()
             // Ballast, then a rail catching what light there is on top of it.
