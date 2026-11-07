@@ -4,6 +4,7 @@
 #include <QtTest>
 
 #include "backend.h"
+#include "light.h"
 #include "theme.h"
 #include "translator.h"
 
@@ -75,6 +76,60 @@ private slots:
         backend.advance(5000);
         backend.start();
         QCOMPARE(backend.progress(), 0.5);
+    }
+
+    void sunriseIsEarlierInSummer()
+    {
+        double summerRise = 0, summerSet = 0, winterRise = 0, winterSet = 0;
+        Light::sunTimes(QDate(2026, 6, 21), summerRise, summerSet);
+        Light::sunTimes(QDate(2026, 12, 21), winterRise, winterSet);
+        QVERIFY(summerRise < winterRise);
+        QVERIFY(summerSet > winterSet);
+        QVERIFY(summerSet - summerRise > 15);
+        QVERIFY(winterSet - winterRise < 9);
+    }
+
+    void noonIsBrightAndMidnightIsDark()
+    {
+        const QColor accent("#FFD60A");
+        const Sky noon = Light::sky(QDateTime(QDate(2026, 6, 21), QTime(12, 30)), accent);
+        const Sky midnight = Light::sky(QDateTime(QDate(2026, 6, 21), QTime(0, 30)), accent);
+        QVERIFY(noon.sunUp);
+        QVERIFY(!midnight.sunUp);
+        QCOMPARE(noon.ambient, 1.0);
+        QVERIFY(midnight.ambient < 0.3);
+        QCOMPARE(noon.stars, 0.0);
+        QCOMPARE(midnight.stars, 1.0);
+        QVERIFY(noon.top.lightnessF() > midnight.top.lightnessF());
+    }
+
+    void lightTurnsGoldenAtSunset()
+    {
+        double rise = 0, set = 0;
+        Light::sunTimes(QDate(2026, 11, 6), rise, set);
+        const QColor accent("#FFD60A");
+        auto at = [&](double hour) {
+            return Light::sky(QDateTime(QDate(2026, 11, 6), QTime(int(hour), int((hour - int(hour)) * 60))), accent);
+        };
+        QVERIFY(at(set - 0.3).warmth > 0.5);
+        QVERIFY(at(12.5).warmth < 0.05);
+        QVERIFY(at(1.0).warmth < 0.05);
+    }
+
+    void moonSharesTheNightSky()
+    {
+        const Sky midnight = Light::sky(QDateTime(QDate(2026, 11, 6), QTime(0, 0)), QColor("#FFD60A"));
+        QVERIFY(midnight.moonElevation > 0.5);
+        QVERIFY(midnight.moonX > 0 && midnight.moonX < 1);
+    }
+
+    void fixedTimeFreezesTheLight()
+    {
+        Light light(QDateTime(QDate(2026, 6, 21), QTime(12, 30)));
+        QVERIFY(light.sunUp());
+        const QColor before = light.skyTop();
+        light.setAccent(QColor("#112233"));
+        QCOMPARE(light.skyTop(), before);
     }
 
     void themeFallsBack()

@@ -69,14 +69,7 @@ ApplicationWindow {
         LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
         LayoutMirroring.childrenInherit: true
 
-        Rectangle {
-            id: sky
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "#121a1f" }
-                GradientStop { position: 1.0; color: "#1b2a22" }
-            }
-        }
+        SkyBackdrop { anchors.fill: parent }
 
         GrowingPlant {
             anchors.fill: parent
@@ -85,6 +78,8 @@ ApplicationWindow {
             seed: backend.seed
             wilted: backend.state === "wilted"
             flowerColor: theme.accent
+            nightTint: light.nightTint
+            warmTint: light.warmTint
         }
 
         // The ground the plant stands in.
@@ -93,13 +88,13 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: parent.height * 0.12 + 6
-            color: "#2a2018"
+            color: Qt.tint(Qt.tint("#2a2018", light.nightTint), light.warmTint)
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
                 height: 4
-                color: "#3a2d20"
+                color: Qt.tint(Qt.tint("#3a2d20", light.nightTint), light.warmTint)
             }
         }
 

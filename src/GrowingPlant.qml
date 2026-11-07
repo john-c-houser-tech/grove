@@ -9,6 +9,9 @@ Canvas {
     property int seed: 1
     property bool wilted: false
     property color flowerColor: "#FFD60A"
+    // The light on the plant: a blue wash at night, a golden one at dawn and dusk.
+    property color nightTint: "transparent"
+    property color warmTint: "transparent"
 
     // Segments are cached per seed and size; growing never rebuilds them.
     property var segments: []
@@ -19,6 +22,10 @@ Canvas {
     onProgressChanged: requestPaint()
     onWiltedChanged: requestPaint()
     onFlowerColorChanged: requestPaint()
+    onNightTintChanged: requestPaint()
+    onWarmTintChanged: requestPaint()
+
+    function lit(color) { return Qt.tint(Qt.tint(color, nightTint), warmTint) }
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
 
@@ -95,12 +102,12 @@ Canvas {
             var a = i * Math.PI * 2 / 5
             ctx.beginPath()
             ctx.arc(x + Math.cos(a) * size * 0.55, y + Math.sin(a) * size * 0.55, size * 0.5, 0, Math.PI * 2)
-            ctx.fillStyle = flowerColor
+            ctx.fillStyle = lit(flowerColor)
             ctx.fill()
         }
         ctx.beginPath()
         ctx.arc(x, y, size * 0.32, 0, Math.PI * 2)
-        ctx.fillStyle = "#fff4c4"
+        ctx.fillStyle = lit("#fff4c4")
         ctx.fill()
     }
 
@@ -113,8 +120,8 @@ Canvas {
             build()
 
         // A wilted plant keeps the shape it reached but loses its colour.
-        var stem = wilted ? "#7d6a45" : "#5f8f4a"
-        var leaf = wilted ? "#8a7647" : "#79b05e"
+        var stem = lit(wilted ? "#7d6a45" : "#5f8f4a")
+        var leaf = lit(wilted ? "#8a7647" : "#79b05e")
         var leafScale = wilted ? 0.6 : 1
         ctx.lineCap = "round"
 

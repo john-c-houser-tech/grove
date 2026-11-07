@@ -1,0 +1,103 @@
+import QtQuick
+
+// The sky, stars, sun and moon, all from the garden's light. The ground
+// covers the bottom of this item, so a sinking sun slips behind it.
+Item {
+    id: root
+
+    // Where the horizon sits, as a fraction of the height.
+    property real horizon: 0.88
+
+    Rectangle {
+        anchors.fill: parent
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: light.skyTop }
+            GradientStop { position: root.horizon; color: light.skyBottom }
+            GradientStop { position: 1.0; color: light.skyBottom }
+        }
+    }
+
+    // Fixed scatter of stars that fade in as the sky darkens.
+    Repeater {
+        model: 70
+        delegate: Rectangle {
+            // A deterministic hash keeps every star in the same place.
+            readonly property real a: (Math.sin(index * 12.9898) * 43758.5453) % 1
+            readonly property real b: (Math.sin(index * 78.233) * 12345.6789) % 1
+            x: Math.abs(a) * root.width
+            y: Math.abs(b) * root.height * (root.horizon - 0.1)
+            width: index % 7 === 0 ? 3 : 2
+            height: width
+            radius: width / 2
+            color: "white"
+            opacity: light.stars * (0.35 + 0.5 * Math.abs((index * 37) % 10) / 10)
+        }
+    }
+
+    // Sun: a glow around a bright disc, warmer near the horizon.
+    Item {
+        visible: light.sunUp
+        readonly property real size: Math.min(root.width, root.height) * 0.07
+        x: root.width * (0.08 + 0.84 * light.sunX) - width / 2
+        y: root.height * (root.horizon - 0.66 * light.elevation) - height / 2
+        width: size
+        height: size
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 2.6
+            height: width
+            radius: width / 2
+            color: "#fff1c9"
+            opacity: 0.12 + 0.1 * light.warmth
+        }
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 1.6
+            height: width
+            radius: width / 2
+            color: "#fff1c9"
+            opacity: 0.2
+        }
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: Qt.tint("#fff6dc", Qt.rgba(light.warmTint.r, light.warmTint.g, light.warmTint.b, light.warmth * 0.5))
+        }
+    }
+
+    // Moon: a crescent cut out of a disc, so it needs no matching sky colour.
+    Item {
+        visible: !light.sunUp
+        readonly property real size: Math.min(root.width, root.height) * 0.055
+        x: root.width * (0.08 + 0.84 * light.moonX) - width / 2
+        y: root.height * (root.horizon - 0.62 * light.moonElevation) - height / 2
+        width: size
+        height: size
+        opacity: Math.min(1, 0.25 + light.stars)
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 2
+            height: width
+            radius: width / 2
+            color: "#dfe8ff"
+            opacity: 0.05
+        }
+        Canvas {
+            anchors.fill: parent
+            onWidthChanged: requestPaint()
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                var r = width / 2
+                ctx.fillStyle = "#eef2ff"
+                ctx.beginPath()
+                ctx.arc(r, r, r, 0, Math.PI * 2)
+                ctx.fill()
+                ctx.globalCompositeOperation = "destination-out"
+                ctx.beginPath()
+                ctx.arc(r * 1.55, r * 0.85, r * 0.92, 0, Math.PI * 2)
+                ctx.fill()
+            }
+        }
+    }
+}

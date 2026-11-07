@@ -1,5 +1,7 @@
 // grove — a focus timer that grows a plant while you work.
 
+#include <QColor>
+#include <QDateTime>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
@@ -8,6 +10,7 @@
 #include <QUrl>
 
 #include "backend.h"
+#include "light.h"
 #include "theme.h"
 #include "translator.h"
 
@@ -34,11 +37,18 @@ int main(int argc, char *argv[]) {
     const int seconds = qEnvironmentVariableIntValue("GROVE_SECONDS", &ok);
     Backend backend(ok && seconds > 0 ? seconds : 25 * 60);
 
+    // GROVE_TIME=HH:MM freezes the sky at that time, to see the light at any hour.
+    const QTime forced = QTime::fromString(qEnvironmentVariable("GROVE_TIME"), "HH:mm");
+    Light light(forced.isValid() ? QDateTime(QDate::currentDate(), forced) : QDateTime());
+    light.setAccent(QColor(theme.accent()));
+    QObject::connect(&theme, &Theme::changed, &light, [&] { light.setAccent(QColor(theme.accent())); });
+
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
     engine.rootContext()->setContextProperty("translator", &translator);
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
+    engine.rootContext()->setContextProperty("light", &light);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;
