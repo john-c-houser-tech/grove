@@ -20,6 +20,8 @@ ApplicationWindow {
     property bool helpVisible: false
     property bool quitConfirmed: false
     readonly property bool growing: backend.state === "growing"
+    // Overcast, rain and fog dull the light on the plant and the ground.
+    readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.14 * weather.cloud + 0.14 * weather.rain + 0.2 * weather.fog))
 
     // Numbers take the language's digits and separators, and re-render when
     // the language changes.
@@ -30,6 +32,23 @@ ApplicationWindow {
     function clock(seconds) {
         var m = Math.floor(seconds / 60), s = seconds % 60
         return number(m) + ":" + (s < 10 ? number(0) : "") + number(s)
+    }
+
+    function seasonName() {
+        switch (weather.season) {
+        case "spring": return qsTr("Spring")
+        case "summer": return qsTr("Summer")
+        case "autumn": return qsTr("Autumn")
+        default: return qsTr("Winter")
+        }
+    }
+    function weatherName() {
+        switch (weather.kind) {
+        case "cloudy": return qsTr("Cloudy")
+        case "rain": return qsTr("Rain")
+        case "fog": return qsTr("Fog")
+        default: return qsTr("Clear")
+        }
     }
 
     function ask(action) {
@@ -50,6 +69,7 @@ ApplicationWindow {
 
     Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Escape"; context: Qt.ApplicationShortcut; enabled: win.helpVisible && !confirm.opened; onActivated: win.helpVisible = false }
+    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: horn.muted = !horn.muted }
     Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: win.quit() }
     Shortcut {
         sequence: "Space"
@@ -74,12 +94,14 @@ ApplicationWindow {
         GrowingPlant {
             anchors.fill: parent
             anchors.topMargin: 90
-            progress: backend.progress
+            progress: weather.growth
             seed: backend.seed
             wilted: backend.state === "wilted"
             flowerColor: theme.accent
             nightTint: light.nightTint
             warmTint: light.warmTint
+            weatherTint: win.weatherTint
+            season: weather.season
         }
 
         // The ground the plant stands in.
@@ -88,14 +110,21 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: parent.height * 0.12 + 6
-            color: Qt.tint(Qt.tint("#2a2018", light.nightTint), light.warmTint)
+            color: Qt.tint(Qt.tint(Qt.tint("#2a2018", win.weatherTint), light.nightTint), light.warmTint)
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
                 height: 4
-                color: Qt.tint(Qt.tint("#3a2d20", light.nightTint), light.warmTint)
+                color: weather.season === "winter" ? Qt.tint(Qt.tint("#cfdde0", light.nightTint), light.warmTint) : Qt.tint(Qt.tint(Qt.tint("#3a2d20", win.weatherTint), light.nightTint), light.warmTint)
             }
+        }
+
+        Precipitation {
+            anchors.fill: parent
+            rain: weather.rain
+            fog: weather.fog
+            ambient: light.ambient
         }
 
         ColumnLayout {
@@ -120,6 +149,23 @@ ApplicationWindow {
                     : backend.state === "done" ? qsTr("Fully grown. Space plants another.")
                     : qsTr("It wilted. Space tries again.")
             }
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                opacity: 0.4
+                font.pixelSize: 12
+                text: win.seasonName() + " · " + win.weatherName()
+            }
+        }
+
+        // Only fog horns can go wrong or be muted, so only say so in fog.
+        Label {
+            anchors.left: parent.left
+            anchors.bottom: parent.bottom
+            anchors.margins: 12
+            visible: weather.fog > 0.5 && (horn.problem !== "" || horn.muted)
+            text: horn.problem !== "" ? horn.problem : qsTr("Fog horns muted. M to unmute.")
+            opacity: 0.6
+            font.pixelSize: 12
         }
 
         Label {
@@ -155,6 +201,7 @@ ApplicationWindow {
                         model: [
                             { k: "Space", d: qsTr("Plant a seed, or give up") },
                             { k: "?", d: qsTr("Show or hide this help") },
+                            { k: "M", d: qsTr("Mute or unmute fog horns") },
                             { k: "Q", d: qsTr("Quit") }
                         ]
                         delegate: RowLayout {

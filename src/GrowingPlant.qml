@@ -12,6 +12,10 @@ Canvas {
     // The light on the plant: a blue wash at night, a golden one at dawn and dusk.
     property color nightTint: "transparent"
     property color warmTint: "transparent"
+    // Grey and damp when it is overcast; the plant sits in the weather too.
+    property color weatherTint: "transparent"
+    // Leaves change colour with the season, and frost settles in winter.
+    property string season: "summer"
 
     // Segments are cached per seed and size; growing never rebuilds them.
     property var segments: []
@@ -24,8 +28,23 @@ Canvas {
     onFlowerColorChanged: requestPaint()
     onNightTintChanged: requestPaint()
     onWarmTintChanged: requestPaint()
+    onWeatherTintChanged: requestPaint()
+    onSeasonChanged: requestPaint()
 
-    function lit(color) { return Qt.tint(Qt.tint(color, nightTint), warmTint) }
+    function lit(color) { return Qt.tint(Qt.tint(Qt.tint(color, weatherTint), nightTint), warmTint) }
+
+    // A leaf's colour is the season's palette indexed by its own tone, so the
+    // same leaf is always the same colour.
+    readonly property var palettes: ({
+        spring: ["#8cc46a", "#9ad07a", "#7ab85c"],
+        summer: ["#79b05e", "#6aa352", "#86b866"],
+        autumn: ["#d9822b", "#c4452c", "#e0b13a", "#8f9a3c"],
+        winter: ["#8fa6a8", "#a9bcc0", "#7e9396"]
+    })
+    function leafColor(tone) {
+        var list = palettes[season] || palettes.summer
+        return list[Math.min(list.length - 1, Math.floor(tone * list.length))]
+    }
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
 
@@ -59,7 +78,7 @@ Canvas {
             if (depth >= 2) {
                 var count = 1 + Math.floor(r() * 2)
                 for (var i = 0; i < count; i++)
-                    leaves.push({ f: 0.35 + r() * 0.6, side: r() < 0.5 ? -1 : 1, size: 0.75 + r() * 0.5 })
+                    leaves.push({ f: 0.35 + r() * 0.6, side: r() < 0.5 ? -1 : 1, size: 0.75 + r() * 0.5, tone: r() })
             }
             segs.push({ x: x, y: y, ex: ex, ey: ey, t0: t0, t1: t1,
                         width: Math.max(1.4, 9 * Math.pow(0.62, depth)), leaves: leaves })
@@ -121,7 +140,7 @@ Canvas {
 
         // A wilted plant keeps the shape it reached but loses its colour.
         var stem = lit(wilted ? "#7d6a45" : "#5f8f4a")
-        var leaf = lit(wilted ? "#8a7647" : "#79b05e")
+        var wiltedLeaf = lit("#8a7647")
         var leafScale = wilted ? 0.6 : 1
         ctx.lineCap = "round"
 
@@ -139,17 +158,29 @@ Canvas {
             ctx.lineWidth = s.width
             ctx.strokeStyle = stem
             ctx.stroke()
+            if (season === "winter" && !wilted) {
+                // Frost rimes the upper edge of each branch.
+                ctx.beginPath()
+                ctx.moveTo(s.x, s.y - s.width * 0.25)
+                ctx.lineTo(s.x + (s.ex - s.x) * p, s.y + (s.ey - s.y) * p - s.width * 0.25)
+                ctx.lineWidth = Math.max(1, s.width * 0.3)
+                ctx.strokeStyle = lit("#e6f1f4")
+                ctx.stroke()
+            }
 
             var heading = Math.atan2(s.ey - s.y, s.ex - s.x)
             for (var j = 0; j < s.leaves.length; j++) {
                 var l = s.leaves[j]
+                // Winter strips most of the leaves.
+                if (season === "winter" && !wilted && l.tone > 0.3)
+                    continue
                 var grown = clamp((p - l.f) * 4)
                 if (grown <= 0)
                     continue
                 var lx = s.x + (s.ex - s.x) * l.f
                 var ly = s.y + (s.ey - s.y) * l.f
                 var tilt = wilted ? 1.5 : 0.9
-                drawLeaf(ctx, lx, ly, heading + l.side * tilt, height * 0.035 * l.size * grown * leafScale, leaf)
+                drawLeaf(ctx, lx, ly, heading + l.side * tilt, height * 0.035 * l.size * grown * leafScale, wilted ? wiltedLeaf : lit(leafColor(l.tone)))
             }
         }
 

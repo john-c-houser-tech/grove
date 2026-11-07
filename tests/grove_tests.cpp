@@ -4,9 +4,11 @@
 #include <QtTest>
 
 #include "backend.h"
+#include "foghorn.h"
 #include "light.h"
 #include "theme.h"
 #include "translator.h"
+#include "weather.h"
 
 class GroveTests : public QObject {
     Q_OBJECT
@@ -130,6 +132,128 @@ private slots:
         const QColor before = light.skyTop();
         light.setAccent(QColor("#112233"));
         QCOMPARE(light.skyTop(), before);
+    }
+
+    void seasonsFollowTheCalendar()
+    {
+        QCOMPARE(Weather::seasonOf(QDate(2026, 4, 1)), QString("spring"));
+        QCOMPARE(Weather::seasonOf(QDate(2026, 7, 1)), QString("summer"));
+        QCOMPARE(Weather::seasonOf(QDate(2026, 11, 6)), QString("autumn"));
+        QCOMPARE(Weather::seasonOf(QDate(2026, 1, 15)), QString("winter"));
+    }
+
+    void pinnedWeatherNeverChanges()
+    {
+        Weather weather("fog");
+        weather.begin(5, QDate(2026, 11, 6));
+        QCOMPARE(weather.kind(), QString("fog"));
+        weather.setProgress(0.5);
+        QCOMPARE(weather.kind(), QString("fog"));
+        weather.setProgress(1.0);
+        QCOMPARE(weather.kind(), QString("fog"));
+        QVERIFY(weather.fog() > 0.8);
+    }
+
+    void sameSeedGivesTheSameWeather()
+    {
+        Weather a, b;
+        a.begin(1234, QDate(2026, 11, 6));
+        b.begin(1234, QDate(2026, 11, 6));
+        for (double p : {0.0, 0.5, 1.0}) {
+            a.setProgress(p);
+            b.setProgress(p);
+            QCOMPARE(a.kind(), b.kind());
+            QCOMPARE(a.cloud(), b.cloud());
+        }
+    }
+
+    void weatherCanChangeDuringASession()
+    {
+        // Some seed in a hundred must start and end differently.
+        bool changed = false;
+        for (int seed = 1; seed < 100 && !changed; ++seed) {
+            Weather weather;
+            weather.begin(seed, QDate(2026, 11, 6));
+            weather.setProgress(0.0);
+            const QString start = weather.kind();
+            weather.setProgress(1.0);
+            changed = weather.kind() != start;
+        }
+        QVERIFY(changed);
+    }
+
+    void autumnIsFoggierThanSummer()
+    {
+        auto share = [](const QString &season) {
+            QRandomGenerator random(99);
+            int fog = 0;
+            for (int i = 0; i < 4000; ++i)
+                fog += Weather::pickKind(random, season) == "fog";
+            return fog / 4000.0;
+        };
+        QVERIFY(share("autumn") > share("summer") * 2);
+    }
+
+    void rainSpeedsGrowthButFinishesOnTime()
+    {
+        Weather weather("rain");
+        weather.begin(1, QDate(2026, 11, 6));
+        QCOMPARE(weather.growth(), 0.0);
+        weather.setProgress(0.5);
+        QVERIFY(weather.growth() > 0.5);
+        QVERIFY(weather.growth() < 0.62);
+        weather.setProgress(1.0);
+        QCOMPARE(weather.growth(), 1.0);
+
+        Weather dry("clear");
+        dry.begin(1, QDate(2026, 11, 6));
+        dry.setProgress(0.5);
+        QVERIFY(qAbs(dry.growth() - 0.5) < 0.01);
+    }
+
+    void growthNeverGoesBackwards()
+    {
+        Weather weather("rain");
+        weather.begin(1, QDate(2026, 11, 6));
+        double last = 0;
+        for (int i = 0; i <= 100; ++i) {
+            weather.setProgress(i / 100.0);
+            QVERIFY(weather.growth() >= last);
+            last = weather.growth();
+        }
+    }
+
+    void fogHornPhraseIsAudibleAndShaped()
+    {
+        const QByteArray pcm = FogHorn::synthesize(44100);
+        QCOMPARE(pcm.size(), 9 * 44100 * 2);
+        const auto *samples = reinterpret_cast<const qint16 *>(pcm.constData());
+        int peak = 0, early = 0;
+        for (int i = 0; i < pcm.size() / 2; ++i) {
+            peak = qMax(peak, qAbs(int(samples[i])));
+            if (i < 200)
+                early = qMax(early, qAbs(int(samples[i])));
+        }
+        QVERIFY(peak > 20000);
+        // The horn swells in rather than clicking on.
+        QVERIFY(early < 500);
+    }
+
+    void fogHornGapsStayWithinRange()
+    {
+        QRandomGenerator random(3);
+        for (int i = 0; i < 200; ++i) {
+            const int gap = FogHorn::nextGapMilliseconds(random);
+            QVERIFY(gap >= 16000 && gap < 34000);
+        }
+    }
+
+    void fogHornMuteIsRemembered()
+    {
+        FogHorn horn(false);
+        QVERIFY(!horn.muted());
+        horn.setMuted(true);
+        QVERIFY(horn.muted());
     }
 
     void themeFallsBack()

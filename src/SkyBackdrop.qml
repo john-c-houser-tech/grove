@@ -17,6 +17,13 @@ Item {
         }
     }
 
+    // Cloud, rain and fog wash the colour out of the sky.
+    Rectangle {
+        anchors.fill: parent
+        color: Qt.rgba(0.28 + 0.3 * light.ambient, 0.31 + 0.3 * light.ambient, 0.36 + 0.28 * light.ambient, 1)
+        opacity: Math.min(0.7, 0.42 * weather.cloud + 0.3 * weather.rain + 0.35 * weather.fog)
+    }
+
     // Fixed scatter of stars that fade in as the sky darkens.
     Repeater {
         model: 70
@@ -30,13 +37,14 @@ Item {
             height: width
             radius: width / 2
             color: "white"
-            opacity: light.stars * (0.35 + 0.5 * Math.abs((index * 37) % 10) / 10)
+            opacity: light.stars * (1 - weather.cloud * 0.9) * (1 - weather.fog * 0.8) * (0.35 + 0.5 * Math.abs((index * 37) % 10) / 10)
         }
     }
 
     // Sun: a glow around a bright disc, warmer near the horizon.
     Item {
         visible: light.sunUp
+        opacity: Math.max(0.05, 1 - 0.55 * weather.cloud - 0.5 * weather.fog)
         readonly property real size: Math.min(root.width, root.height) * 0.07
         x: root.width * (0.08 + 0.84 * light.sunX) - width / 2
         y: root.height * (root.horizon - 0.66 * light.elevation) - height / 2
@@ -73,7 +81,7 @@ Item {
         y: root.height * (root.horizon - 0.62 * light.moonElevation) - height / 2
         width: size
         height: size
-        opacity: Math.min(1, 0.25 + light.stars)
+        opacity: Math.min(1, 0.25 + light.stars) * Math.max(0.05, 1 - 0.7 * weather.cloud - 0.5 * weather.fog)
         Rectangle {
             anchors.centerIn: parent
             width: parent.width * 2
@@ -99,5 +107,13 @@ Item {
                 ctx.fill()
             }
         }
+    }
+
+    Clouds {
+        anchors.fill: parent
+        opacity: 1 - 0.85 * weather.fog
+        cover: weather.cloud
+        rain: weather.rain
+        ambient: light.ambient
     }
 }

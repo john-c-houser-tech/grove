@@ -7,12 +7,15 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QRandomGenerator>
 #include <QUrl>
 
 #include "backend.h"
+#include "foghorn.h"
 #include "light.h"
 #include "theme.h"
 #include "translator.h"
+#include "weather.h"
 
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
@@ -37,11 +40,29 @@ int main(int argc, char *argv[]) {
     const int seconds = qEnvironmentVariableIntValue("GROVE_SECONDS", &ok);
     Backend backend(ok && seconds > 0 ? seconds : 25 * 60);
 
-    // GROVE_TIME=HH:MM freezes the sky at that time, to see the light at any hour.
-    const QTime forced = QTime::fromString(qEnvironmentVariable("GROVE_TIME"), "HH:mm");
-    Light light(forced.isValid() ? QDateTime(QDate::currentDate(), forced) : QDateTime());
+    // GROVE_TIME=HH:MM and GROVE_DATE=YYYY-MM-DD freeze the sky, and
+    // GROVE_WEATHER=clear|cloudy|rain|fog pins the weather, to see any of them.
+    const QTime forcedTime = QTime::fromString(qEnvironmentVariable("GROVE_TIME"), "HH:mm");
+    const QDate forcedDate = QDate::fromString(qEnvironmentVariable("GROVE_DATE"), Qt::ISODate);
+    const QDate today = forcedDate.isValid() ? forcedDate : QDate::currentDate();
+    Light light(forcedTime.isValid() || forcedDate.isValid()
+                    ? QDateTime(today, forcedTime.isValid() ? forcedTime : QTime::currentTime())
+                    : QDateTime());
     light.setAccent(QColor(theme.accent()));
     QObject::connect(&theme, &Theme::changed, &light, [&] { light.setAccent(QColor(theme.accent())); });
+
+    Weather weather(qEnvironmentVariable("GROVE_WEATHER"));
+    weather.begin(1 + QRandomGenerator::global()->bounded(1 << 30), today);
+    FogHorn horn;
+    // A new session rolls new weather; the plant's progress carries it along.
+    auto updateHorn = [&] { horn.setActive(backend.state() == "growing" && weather.fog() > 0.5); };
+    QObject::connect(&backend, &Backend::stateChanged, &weather, [&] {
+        if (backend.state() == "growing")
+            weather.begin(backend.seed(), today);
+        updateHorn();
+    });
+    QObject::connect(&backend, &Backend::progressChanged, &weather, [&] { weather.setProgress(backend.progress()); });
+    QObject::connect(&weather, &Weather::changed, &horn, updateHorn);
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
@@ -49,6 +70,8 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("light", &light);
+    engine.rootContext()->setContextProperty("weather", &weather);
+    engine.rootContext()->setContextProperty("horn", &horn);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;
