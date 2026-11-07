@@ -80,10 +80,13 @@ the same or the line before.
 - A bug fix comes with a test that fails without it. Check by undoing the fix.
 - Unit tests cover classes; scene tests cover what a user does, through keys,
   in the real window.
-- Nothing is shown on the desktop: tests run on the offscreen platform.
-  `GROVE_SHOTS=dir build/scene_tests/scene_tests framesForReview` saves
-  frames of several scenes for review. A visual change is checked by
-  comparing them with the previous build's.
+- Nothing is shown on the desktop: the scene-test program always runs on the
+  offscreen platform, whatever the session sets, so every command below is
+  headless as written. `GROVE_SHOTS=dir build/scene_tests/scene_tests
+  framesForReview` saves frames of several scenes for review; a visual change
+  is checked by comparing them with the previous build's.
+  `GROVE_README_SHOTS=dir build/scene_tests/scene_tests framesForReadme` makes
+  the README's two pictures the same way.
 - Tests never touch the user's garden, theme, language, notifications or
   settings: `App::Options` points each at the test's own.
 

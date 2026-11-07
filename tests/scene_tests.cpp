@@ -1,7 +1,8 @@
 // The whole app, its real window drawn offscreen and driven by keys, as a user
 // would: nothing appears on the desktop, and the same run is what the leak
-// check watches. bin/test runs it on the offscreen platform with the GPU
-// renderer, so particles and textures are drawn as they are on screen.
+// check watches. main() below keeps it offscreen however it is started, and
+// draws with the GPU renderer, so particles and textures are drawn as they
+// are on screen.
 
 #include <QColor>
 #include <QDir>
@@ -9,8 +10,10 @@
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QScopeGuard>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <array>
 #include <memory>
 #ifdef __GLIBC__
 #include <malloc.h>
@@ -196,6 +199,54 @@ private slots:
         QVERIFY(grab().save(out + "/garden.png"));
     }
 
+    // Not a test: with GROVE_README_SHOTS set to a directory, saves the README's
+    // two pictures there (bin/test leaves it unset). A session's plant comes
+    // from a random seed, so look before keeping one.
+    void framesForReadme() {
+        const QString out = qEnvironmentVariable("GROVE_README_SHOTS");
+        if (out.isEmpty())
+            QSKIP("set GROVE_README_SHOTS to a directory to save the README's pictures");
+        QDir().mkpath(out);
+
+        // Sound stays on but silent, so the window shows no "sounds are off".
+        qputenv("GROVE_SOUND_VOLUME", "0");
+        const auto unmuted = qScopeGuard([] { qunsetenv("GROVE_SOUND_VOLUME"); });
+
+        // An autumn plant nearly grown on a clear morning, a minute and a half
+        // from the end of its session.
+        App::Options morning = baseOptions(25 * 60);
+        morning.date = QDate(2026, 10, 20);
+        morning.time = QTime(9, 45);
+        start(morning);
+        m_app->sounds().setMuted(false);
+        press(Qt::Key_Space);
+        m_app->backend().advance((25 * 60 - 89) * 1000);
+        QTest::qWait(2500);
+        QVERIFY(grab().save(out + "/grove.png"));
+        m_app.reset();
+
+        // Twelve October days in the garden, ten grown and two wilted: three full
+        // rows, nothing cut off at the bottom.
+        start();
+        m_app->sounds().setMuted(false);
+        const std::array<const char *, 12> weathers{"clear", "rain",   "clear", "cloudy", "clear", "cloudy",
+                                                    "clear", "cloudy", "clear", "fog",    "clear", "rain"};
+        for (int day = 0; day < 12; ++day) {
+            Garden::Plant p;
+            p.seed = 101 + day * 37;
+            p.outcome = day == 3 || day == 8 ? "wilted" : "done";
+            p.season = "autumn";
+            p.weather = weathers.at(day);
+            p.progress = p.outcome == "done" ? 1.0 : 0.3 + 0.1 * (day % 3);
+            p.when = QDateTime(QDate(2026, 10, 9 + day / 2 + day % 2), QTime(9 + day % 5, 0));
+            p.minutes = p.outcome == "done" ? 25 : 0;
+            m_app->garden().record(p);
+        }
+        press(Qt::Key_G);
+        QTest::qWait(1500);
+        QVERIFY(grab().save(out + "/garden.png"));
+    }
+
 private:
     App::Options baseOptions(int seconds) const {
         App::Options options;
@@ -307,5 +358,19 @@ private:
     const char *m_accent = "#FFD60A";
 };
 
-QTEST_MAIN(SceneTests)
+// Never on the desktop, however the program is started: the session's own
+// QT_QPA_PLATFORM (Omarchy sets wayland) is overridden. The renderer is the
+// GPU's, as on screen, unless one is named; bin/check-leaks names the software
+// renderer under Valgrind.
+int main(int argc, char *argv[]) {
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    if (!qEnvironmentVariableIsSet("QT_QUICK_BACKEND")) {
+        qputenv("QT_QUICK_BACKEND", "rhi");
+        qputenv("QSG_RHI_BACKEND", "opengl");
+    }
+    const QGuiApplication application(argc, argv);
+    SceneTests tests;
+    QTEST_SET_MAIN_SOURCE_PATH
+    return QTest::qExec(&tests, argc, argv);
+}
 #include "scene_tests.moc"
