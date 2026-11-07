@@ -46,8 +46,15 @@ Item {
         }
     }
 
+    // Where the sun and its glow are, or the moon at night, so that text can
+    // keep clear of it.
+    readonly property rect bodyArea: light.sunUp
+        ? Qt.rect(sun.x - sun.width * 0.8, sun.y - sun.height * 0.8, sun.width * 2.6, sun.height * 2.6)
+        : Qt.rect(moon.x, moon.y, moon.width, moon.height)
+
     // Sun: a glow around a bright disc, warmer near the horizon.
     Item {
+        id: sun
         visible: light.sunUp
         opacity: Math.max(0.05, 1 - 0.55 * weather.cloud - 0.5 * weather.fog)
         readonly property real size: Math.min(root.width, root.height) * 0.07
@@ -80,6 +87,7 @@ Item {
 
     // Moon: the whole disk, with the sunlit part a crescent.
     Item {
+        id: moon
         visible: !light.sunUp
         readonly property real size: Math.min(root.width, root.height) * 0.055
         x: root.width * (0.08 + 0.84 * light.moonX) - width / 2

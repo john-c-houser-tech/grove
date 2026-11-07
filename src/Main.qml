@@ -82,6 +82,7 @@ ApplicationWindow {
         LayoutMirroring.childrenInherit: true
 
         SkyBackdrop {
+            id: sky
             anchors.fill: parent
             groundY: field.farEdgeY
         }
@@ -147,15 +148,36 @@ ApplicationWindow {
             ambient: light.ambient
         }
 
-        // Small and quiet, so the scene comes first.
+        // Small and quiet, so the scene comes first. It sits at the top right,
+        // in open sky, and crosses to the left while the sun or moon is there;
+        // they move slowly, so it crosses at most once each way.
         ColumnLayout {
+            id: heading
             anchors.top: parent.top
             anchors.topMargin: 18
-            anchors.horizontalCenter: parent.horizontalCenter
             spacing: 2
 
+            readonly property real margin: 24
+            // How close the sun's glow may come before the text gives way.
+            readonly property real clearance: 12
+            readonly property bool sunOnRight: {
+                var body = sky.bodyArea, left = parent.width - margin - width - clearance
+                return body.x + body.width > left && body.x < parent.width
+                    && body.y < y + height + clearance && body.y + body.height > y - clearance
+            }
+            // 1 on the right, 0 on the left, eased between so the move is
+            // gentle while a resize still follows at once.
+            property real side: sunOnRight ? 0 : 1
+            Behavior on side { NumberAnimation { duration: 1500; easing.type: Easing.InOutQuad } }
+            x: margin + side * (parent.width - 2 * margin - width)
+            readonly property int lineAlignment: side > 0.5 ? Qt.AlignRight : Qt.AlignLeft
+            // The side follows the sky, not the reading direction, so the
+            // lines keep to it in right-to-left languages too.
+            LayoutMirroring.enabled: false
+            LayoutMirroring.childrenInherit: true
+
             Label {
-                Layout.alignment: Qt.AlignHCenter
+                Layout.alignment: heading.lineAlignment
                 text: backend.state === "idle" ? qsTr("%n minutes", "", backend.minutes)
                     : win.clock(backend.state === "growing" ? backend.remaining : 0)
                 font.pixelSize: 24
@@ -163,7 +185,7 @@ ApplicationWindow {
                 opacity: 0.75
             }
             Label {
-                Layout.alignment: Qt.AlignHCenter
+                Layout.alignment: heading.lineAlignment
                 opacity: 0.5
                 font.pixelSize: 12
                 text: backend.state === "idle" ? qsTr("Press Space to plant a seed")
