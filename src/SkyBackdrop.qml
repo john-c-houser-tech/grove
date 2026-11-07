@@ -121,13 +121,19 @@ Item {
         // Winter snow reaches low; by summer only the highest peaks keep any.
         readonly property real snowline: weather.season === "winter" ? 0.42 : weather.season === "spring" ? 0.58
                                        : weather.season === "autumn" ? 0.66 : 0.8
-        readonly property color farColor: lit("#697d9a", 0.38)
+        // After dark the land goes to silhouette against the sky, so the far
+        // peaks keep an edge even when cloud washes the sky toward their colour.
+        readonly property real dark: 1 - light.ambient
+        readonly property color farColor: Qt.tint(lit("#697d9a", 0.38), Qt.rgba(0.02, 0.03, 0.06, 0.5 * dark))
         readonly property color midColor: lit("#44605a", 0.24)
         readonly property color nearColor: lit("#2f4a3a", 0.08)
         // The valley floor the railway runs along, between the ridges and the
         // near hills.
         readonly property color floorColor: lit("#56704c", 0.16)
-        readonly property color snowColor: Qt.tint(Qt.tint(Qt.tint("#f4f7fb", weatherTint), light.nightTint), light.warmTint)
+        // Snow only shines where there is light on it. At night it sinks toward
+        // the colour of the mountain, so a cap never glows on its own.
+        readonly property color snowColor: Qt.tint(Qt.tint(Qt.tint(Qt.tint("#f4f7fb", weatherTint), light.nightTint), light.warmTint),
+                                                   Qt.rgba(farColor.r, farColor.g, farColor.b, 0.6 * dark))
     }
 
     Hills {
