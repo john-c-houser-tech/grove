@@ -106,6 +106,10 @@ if command -v valgrind >/dev/null; then
     done
     [ "$vfailed" = 1 ] && failed=1
     [ "$canary" = 0 ] && [ "$vfailed" = 0 ] && echo "valgrind: no leaks or memory errors"
+elif [ "$canary" = 1 ]; then
+    # A canary run proves every part, so a part that cannot run fails it.
+    echo "canary: Valgrind is not installed, so its part cannot be proved (sudo pacman -S valgrind)"
+    exit 1
 else
     echo "valgrind: not installed, so skipped (sudo pacman -S valgrind)"
 fi
