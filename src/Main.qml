@@ -89,7 +89,8 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            height: parent.height * 0.12 + 6
+            // From where the field ends, out at 40 m, to the bottom.
+            height: parent.height - field.farEdgeY
             color: Qt.tint(Qt.tint(Qt.tint("#2a2018", win.weatherTint), light.nightTint), light.warmTint)
         }
 
@@ -97,9 +98,10 @@ ApplicationWindow {
         Field {
             id: field
             anchors.fill: parent
-            groundTop: ground.y
+            groundTop: farEdgeY
             part: "far"
             soilColor: ground.color
+            hazeColor: light.skyBottom
             snow: weather.snow
             frost: weather.season === "winter"
         }
@@ -125,8 +127,9 @@ ApplicationWindow {
         Field {
             anchors.fill: parent
             part: "near"
-            groundTop: ground.y
+            groundTop: farEdgeY
             soilColor: ground.color
+            hazeColor: light.skyBottom
             snow: weather.snow
             frost: weather.season === "winter"
         }

@@ -123,20 +123,54 @@ Item {
             ctx.closePath()
             ctx.fillStyle = root.floorColor
             ctx.fill()
-            // A dirt road comes up from the near meadow, over the rails and a
-            // little way on, narrowing with distance. The signal stands on its
-            // right-hand verge, so the road lies just to the left of it.
+            // A dirt road. Beyond the rails it runs off into the distance; on
+            // this side it comes a little toward us, then curves away to the
+            // right along the valley floor and goes behind the hill there. The
+            // signal stands on its right-hand verge.
             var post = W * root.crossingX, cy = root.trackY(root.crossingX)
-            var gap = H * 0.006, nearWidth = H * 0.05
-            ctx.beginPath()
-            ctx.moveTo(post - gap - nearWidth * 0.6, cy - H * 0.022)
-            ctx.lineTo(post - gap - nearWidth * 0.52, cy - H * 0.022)
-            ctx.lineTo(post - gap, cy)
-            ctx.lineTo(post - gap + H * 0.05, H)
-            ctx.lineTo(post - gap - nearWidth - H * 0.07, H)
-            ctx.lineTo(post - gap - nearWidth, cy)
-            ctx.closePath()
+            var gap = H * 0.006, crossing = H * 0.05
+            var centre = post - gap - crossing / 2
             ctx.fillStyle = root.roadColor
+            ctx.beginPath()
+            ctx.moveTo(centre - crossing * 0.1 - H * 0.004, cy - H * 0.022)
+            ctx.lineTo(centre - crossing * 0.1 + H * 0.004, cy - H * 0.022)
+            ctx.lineTo(centre + crossing / 2, cy)
+            ctx.lineTo(centre - crossing / 2, cy)
+            ctx.closePath()
+            ctx.fill()
+            // The near side as a band along a curve: wide where it crosses the
+            // line square on, and thin where it turns to run across our view.
+            function bend(t) {
+                var u = 1 - t
+                var p0 = { x: centre, y: cy }, p1 = { x: centre, y: cy + H * 0.03 }
+                var p2 = { x: centre + W * 0.1, y: cy + H * 0.034 }, p3 = { x: W * 1.08, y: cy + H * 0.028 }
+                return {
+                    x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+                    y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
+                }
+            }
+            var upper = [], lower = []
+            for (var i = 0; i <= 40; i++) {
+                var t = i / 40
+                var at = bend(t), next = bend(Math.min(1, t + 0.01)), prev = bend(Math.max(0, t - 0.01))
+                var dx = next.x - prev.x, dy = next.y - prev.y, len = Math.sqrt(dx * dx + dy * dy) || 1
+                // Seen from low down, a road running across the view is mostly
+                // foreshortened away; the squarer it runs toward us, the wider.
+                var across = Math.abs(dy) / len
+                var half = H * (0.006 + 0.019 * across)
+                var nx = -dy / len, ny = dx / len
+                // Toward us the road is wide side to side; running across, it is
+                // thin top to bottom.
+                upper.push({ x: at.x + nx * half, y: at.y + ny * half * (1 - across) - (1 - across) * half * 0.2 })
+                lower.push({ x: at.x - nx * half, y: at.y - ny * half * (1 - across) + (1 - across) * half * 0.2 })
+            }
+            ctx.beginPath()
+            ctx.moveTo(upper[0].x, upper[0].y)
+            for (var a = 1; a < upper.length; a++)
+                ctx.lineTo(upper[a].x, upper[a].y)
+            for (var b = lower.length - 1; b >= 0; b--)
+                ctx.lineTo(lower[b].x, lower[b].y)
+            ctx.closePath()
             ctx.fill()
             // Ballast, then a rail catching what light there is on top of it.
             line()
