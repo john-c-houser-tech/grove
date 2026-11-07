@@ -34,5 +34,10 @@
   "The garden file could not be read. It was left untouched, and new plants will not be saved.": "庭のファイルを読み込めませんでした。そのままにしてあり、新しい植物は保存されません。",
   "%n minutes": {
     "other": "%n分"
-  }
+  },
+  "Snow": "雪",
+  "Your plant is fully grown": "植物がすっかり育ちました",
+  "Take a breath, then plant another.": "ひと息ついて、また一本植えましょう。",
+  "No desktop session bus, so Grove cannot send notifications.": "デスクトップのセッションバスがないため、Groveは通知を送れません。",
+  "No notification service is running, so Grove cannot tell you when a plant is done.": "通知サービスが動いていないため、Groveは植物が育ったことをお知らせできません。"
 }

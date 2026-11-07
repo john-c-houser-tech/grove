@@ -36,5 +36,10 @@
     "one": "%n minuto",
     "many": "%n de minutos",
     "other": "%n minutos"
-  }
+  },
+  "Snow": "Neve",
+  "Your plant is fully grown": "Sua planta cresceu por completo",
+  "Take a breath, then plant another.": "Respire fundo e depois plante outra.",
+  "No desktop session bus, so Grove cannot send notifications.": "Nenhum barramento de sessão da área de trabalho, então o Grove não pode enviar notificações.",
+  "No notification service is running, so Grove cannot tell you when a plant is done.": "Nenhum serviço de notificações está em execução, então o Grove não pode avisar quando uma planta terminar."
 }

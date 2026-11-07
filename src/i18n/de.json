@@ -35,5 +35,10 @@
   "%n minutes": {
     "one": "%n Minute",
     "other": "%n Minuten"
-  }
+  },
+  "Snow": "Schnee",
+  "Your plant is fully grown": "Deine Pflanze ist ausgewachsen",
+  "Take a breath, then plant another.": "Atme durch und pflanze dann eine neue.",
+  "No desktop session bus, so Grove cannot send notifications.": "Kein Sitzungsbus des Desktops, daher kann Grove keine Benachrichtigungen senden.",
+  "No notification service is running, so Grove cannot tell you when a plant is done.": "Es läuft kein Benachrichtigungsdienst, daher kann Grove dir nicht sagen, wann eine Pflanze fertig ist."
 }

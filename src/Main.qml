@@ -22,7 +22,7 @@ ApplicationWindow {
     property bool quitConfirmed: false
     readonly property bool growing: backend.state === "growing"
     // Overcast, rain and fog dull the light on the plant and the ground.
-    readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.14 * weather.cloud + 0.14 * weather.rain + 0.28 * weather.fog))
+    readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.14 * weather.cloud + 0.14 * weather.rain + 0.14 * weather.snow + 0.28 * weather.fog))
 
     // Numbers take the language's digits and separators, and re-render when
     // the language changes.
@@ -47,6 +47,7 @@ ApplicationWindow {
         switch (weather.kind) {
         case "cloudy": return qsTr("Cloudy")
         case "rain": return qsTr("Rain")
+        case "snow": return qsTr("Snow")
         case "fog": return qsTr("Fog")
         default: return qsTr("Clear")
         }
@@ -122,14 +123,15 @@ ApplicationWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                height: 4
-                color: weather.season === "winter" ? Qt.tint(Qt.tint("#cfdde0", light.nightTint), light.warmTint) : Qt.tint(Qt.tint(Qt.tint("#3a2d20", win.weatherTint), light.nightTint), light.warmTint)
+                height: 4 + 16 * weather.snow
+                color: weather.season === "winter" || weather.snow > 0.05 ? Qt.tint(Qt.tint("#cfdde0", light.nightTint), light.warmTint) : Qt.tint(Qt.tint(Qt.tint("#3a2d20", win.weatherTint), light.nightTint), light.warmTint)
             }
         }
 
         Precipitation {
             anchors.fill: parent
             rain: weather.rain
+            snow: weather.snow
             fog: weather.fog
             ambient: light.ambient
         }
@@ -192,8 +194,8 @@ ApplicationWindow {
             width: parent.width - 220
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
-            visible: garden.problem !== ""
-            text: garden.problem
+            visible: garden.problem !== "" || notifier.problem !== ""
+            text: garden.problem !== "" ? garden.problem : notifier.problem
             color: "#ffb4a8"
             font.pixelSize: 12
         }

@@ -16,6 +16,7 @@ Rectangle {
         switch (kind) {
         case "cloudy": return qsTr("Cloudy")
         case "rain": return qsTr("Rain")
+        case "snow": return qsTr("Snow")
         case "fog": return qsTr("Fog")
         default: return qsTr("Clear")
         }

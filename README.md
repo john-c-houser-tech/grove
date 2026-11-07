@@ -9,14 +9,18 @@ way it stays in your garden.
 - **Light follows the clock.** Dawn, noon, golden hour and night, with dusk
   warming toward your Omarchy accent. Day length follows the calendar for a
   mid-northern latitude. There is no location lookup.
-- **Weather and seasons.** Each session rolls its own sky (clear, cloudy, rain
-  or fog), weighted by the season, and it can change part-way through. Rain
+- **Weather and seasons.** Each session rolls its own sky (clear, cloudy, rain,
+  fog, and snow in winter only), weighted by the season, and it can change part-way through. Rain
   nudges growth along a little. Leaves are green, then autumn colours, then
   bare and frosted in winter. The weather is invented, never fetched.
 - **Fog horns.** In fog a deep horn sounds now and then, with a quieter answer
   from farther out. It is synthesized at start-up, so nothing is shipped or
   downloaded. M mutes it.
 - **A garden.** Every finished or wilted plant is kept, and G shows them all.
+- **A nudge when it is done.** A desktop notification tells you the plant is
+  fully grown, even if Grove is buried under other windows. Your shell's
+  do-not-disturb silences it like any other. If there is no notification
+  service, the window says so.
 
 ![The garden, with a plant for each session](docs/garden.png)
 
@@ -57,10 +61,10 @@ window, and does not save over it.
 
 | Variable | Effect |
 |----------|--------|
-| `GROVE_SECONDS=30` | A short session. It is not saved to the garden unless `GROVE_GARDEN` is also set. |
+| `GROVE_SECONDS=30` | A short session. It is not saved to the garden, and sends no notification, unless `GROVE_GARDEN` is also set. |
 | `GROVE_TIME=17:05` | Freeze the sky at that time. |
 | `GROVE_DATE=2026-10-20` | Pin the date, and so the season. |
-| `GROVE_WEATHER=fog` | Pin the weather: `clear`, `cloudy`, `rain` or `fog`. |
+| `GROVE_WEATHER=fog` | Pin the weather: `clear`, `cloudy`, `rain`, `snow` or `fog`. |
 | `GROVE_GARDEN=/path/garden.json` | Use another garden file. |
 
 ## License

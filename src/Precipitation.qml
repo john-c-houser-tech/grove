@@ -8,6 +8,7 @@ Item {
 
     property real rain: 0
     property real fog: 0
+    property real snow: 0
     property real ambient: 1
     // Fog is grey-blue in the dark and pale grey by day.
     readonly property color fogColor: Qt.rgba(0.2 + 0.58 * ambient, 0.23 + 0.58 * ambient, 0.28 + 0.56 * ambient, 1)
@@ -36,6 +37,39 @@ Item {
             rotation: 8
             color: "#b4cde0"
             opacity: 0.45
+        }
+    }
+
+    // Snow drifts down and sways, a few large flakes among many small ones.
+    ParticleSystem {
+        id: snowSystem
+        running: root.snow > 0.02
+    }
+    Emitter {
+        system: snowSystem
+        x: -40
+        y: -20
+        width: root.width + 80
+        height: 1
+        enabled: root.snow > 0.02
+        emitRate: 50 * root.snow
+        lifeSpan: 8000
+        velocity: AngleDirection { angle: 90; angleVariation: 8; magnitude: 100; magnitudeVariation: 30 }
+        size: 1
+    }
+    Wander {
+        system: snowSystem
+        xVariance: 45
+        pace: 90
+    }
+    ItemParticle {
+        system: snowSystem
+        delegate: Rectangle {
+            width: 3 + Math.random() * 5
+            height: width
+            radius: width / 2
+            color: root.ambient > 0.5 ? "#ffffff" : "#c9d6ee"
+            opacity: 0.55 + Math.random() * 0.4
         }
     }
 

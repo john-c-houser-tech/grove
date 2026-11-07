@@ -35,5 +35,10 @@
   "%n minutes": {
     "one": "%n minut",
     "other": "%n minutter"
-  }
+  },
+  "Snow": "Sne",
+  "Your plant is fully grown": "Din plante er fuldt udvokset",
+  "Take a breath, then plant another.": "Træk vejret, og plant så en ny.",
+  "No desktop session bus, so Grove cannot send notifications.": "Ingen sessionsbus på skrivebordet, så Grove kan ikke sende notifikationer.",
+  "No notification service is running, so Grove cannot tell you when a plant is done.": "Ingen notifikationstjeneste kører, så Grove kan ikke fortælle dig, når en plante er færdig."
 }

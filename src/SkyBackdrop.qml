@@ -21,7 +21,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(0.28 + 0.3 * light.ambient, 0.31 + 0.3 * light.ambient, 0.36 + 0.28 * light.ambient, 1)
-        opacity: Math.min(0.7, 0.42 * weather.cloud + 0.3 * weather.rain + 0.35 * weather.fog)
+        opacity: Math.min(0.7, 0.42 * weather.cloud + 0.3 * weather.rain + 0.3 * weather.snow + 0.35 * weather.fog)
     }
 
     // Fixed scatter of stars that fade in as the sky darkens.

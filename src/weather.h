@@ -14,16 +14,17 @@ class Weather : public QObject {
     Q_PROPERTY(QString season READ season NOTIFY changed)
     Q_PROPERTY(double cloud READ cloud NOTIFY changed)
     Q_PROPERTY(double rain READ rain NOTIFY changed)
+    Q_PROPERTY(double snow READ snow NOTIFY changed)
     Q_PROPERTY(double fog READ fog NOTIFY changed)
     Q_PROPERTY(double growth READ growth NOTIFY changed)
 
 public:
     struct Conditions {
-        double cloud = 0, rain = 0, fog = 0;
+        double cloud = 0, rain = 0, fog = 0, snow = 0;
     };
 
-    // A kind name ("clear", "cloudy", "rain" or "fog") pins the weather, for
-    // screenshots and tests; the empty string lets it roll.
+    // A kind name ("clear", "cloudy", "rain", "snow" or "fog") pins the weather, for
+    // screenshots and tests; the empty string lets it roll. Snow only rolls in winter.
     explicit Weather(const QString &forcedKind = {}, QObject *parent = nullptr);
 
     // The dominant weather right now.
@@ -31,6 +32,7 @@ public:
     QString season() const { return m_season; }
     double cloud() const { return m_now.cloud; }
     double rain() const { return m_now.rain; }
+    double snow() const { return m_now.snow; }
     double fog() const { return m_now.fog; }
     // Session progress as the plant shows it: rain nudges growth along, and a
     // finished session is always a finished plant.

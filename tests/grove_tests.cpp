@@ -7,6 +7,7 @@
 #include "foghorn.h"
 #include "garden.h"
 #include "light.h"
+#include "notifier.h"
 #include "theme.h"
 #include "translator.h"
 #include "weather.h"
@@ -319,6 +320,41 @@ private slots:
         QFile file(path);
         QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll(), bad);
+    }
+
+    void snowOnlyFallsInWinter()
+    {
+        auto snowShare = [](const QString &season) {
+            QRandomGenerator random(5);
+            int snow = 0;
+            for (int i = 0; i < 4000; ++i)
+                snow += Weather::pickKind(random, season) == "snow";
+            return snow / 4000.0;
+        };
+        QCOMPARE(snowShare("spring"), 0.0);
+        QCOMPARE(snowShare("summer"), 0.0);
+        QCOMPARE(snowShare("autumn"), 0.0);
+        QVERIFY(snowShare("winter") > 0.15);
+    }
+
+    void snowIsSnowNotRain()
+    {
+        Weather weather("snow");
+        weather.begin(1, QDate(2026, 1, 15));
+        QCOMPARE(weather.kind(), QString("snow"));
+        QVERIFY(weather.snow() > 0.8);
+        QCOMPARE(weather.rain(), 0.0);
+        // Snow does not hurry the plant along the way rain does.
+        weather.setProgress(0.5);
+        QVERIFY(qAbs(weather.growth() - 0.5) < 0.01);
+    }
+
+    void notifierSaysSoWhenThereIsNoService()
+    {
+        Notifier notifier("org.grove.NoSuchService");
+        QVERIFY(notifier.problem().isEmpty());
+        notifier.plantGrown();
+        QTRY_VERIFY_WITH_TIMEOUT(!notifier.problem().isEmpty(), 5000);
     }
 
     void themeFallsBack()

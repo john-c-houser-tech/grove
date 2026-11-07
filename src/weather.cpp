@@ -10,7 +10,7 @@ double smoothstep(double a, double b, double x) {
 }
 
 bool known(const QString &kind) {
-    return kind == "clear" || kind == "cloudy" || kind == "rain" || kind == "fog";
+    return kind == "clear" || kind == "cloudy" || kind == "rain" || kind == "snow" || kind == "fog";
 }
 
 } // namespace
@@ -22,12 +22,14 @@ Weather::Weather(const QString &forcedKind, QObject *parent)
 
 Weather::Conditions Weather::conditions(const QString &kind) {
     if (kind == "cloudy")
-        return {0.75, 0, 0};
+        return {0.75, 0, 0, 0};
     if (kind == "rain")
-        return {0.95, 0.8, 0};
+        return {0.95, 0.8, 0, 0};
+    if (kind == "snow")
+        return {0.9, 0, 0, 0.85};
     if (kind == "fog")
-        return {0.15, 0, 1.0};
-    return {0.0, 0, 0};
+        return {0.15, 0, 1.0, 0};
+    return {0.0, 0, 0, 0};
 }
 
 QString Weather::seasonOf(const QDate &date) {
@@ -41,14 +43,14 @@ QString Weather::seasonOf(const QDate &date) {
 }
 
 QString Weather::pickKind(QRandomGenerator &random, const QString &season) {
-    // Weights for clear, cloudy, rain and fog. Summer is mostly clear and
-    // autumn is the foggy season.
-    static const QStringList kinds{"clear", "cloudy", "rain", "fog"};
-    static const double spring[4] = {3, 3, 3, 1}, summer[4] = {6, 2, 0.7, 0.5}, autumn[4] = {2, 3, 3, 2.5},
-                        winter[4] = {1, 3, 2.5, 2};
+    static const QStringList kinds{"clear", "cloudy", "rain", "fog", "snow"};
+    // Weights for clear, cloudy, rain, fog and snow. Summer is mostly clear,
+    // autumn is the foggy season, and only winter brings snow.
+    static const double spring[5] = {3, 3, 3, 1, 0}, summer[5] = {6, 2, 0.7, 0.5, 0}, autumn[5] = {2, 3, 3, 2.5, 0},
+                        winter[5] = {1, 3, 1.5, 2, 2.5};
     const double *w = season == "summer" ? summer : season == "autumn" ? autumn : season == "winter" ? winter : spring;
-    double pick = random.generateDouble() * (w[0] + w[1] + w[2] + w[3]);
-    for (int i = 0; i < 4; ++i) {
+    double pick = random.generateDouble() * (w[0] + w[1] + w[2] + w[3] + w[4]);
+    for (int i = 0; i < 5; ++i) {
         if (pick < w[i])
             return kinds[i];
         pick -= w[i];
@@ -84,6 +86,8 @@ void Weather::setProgress(double progress) {
 QString Weather::kind() const {
     if (m_now.fog >= 0.45)
         return "fog";
+    if (m_now.snow >= 0.4)
+        return "snow";
     if (m_now.rain >= 0.4)
         return "rain";
     if (m_now.cloud >= 0.5)
@@ -95,6 +99,7 @@ void Weather::refresh() {
     // The change happens in the middle of the session, not at a fixed moment.
     const double s = smoothstep(0.3, 0.7, m_progress);
     const Conditions a = conditions(m_from), b = conditions(m_to);
-    m_now = {a.cloud + (b.cloud - a.cloud) * s, a.rain + (b.rain - a.rain) * s, a.fog + (b.fog - a.fog) * s};
+    m_now = {a.cloud + (b.cloud - a.cloud) * s, a.rain + (b.rain - a.rain) * s, a.fog + (b.fog - a.fog) * s,
+             a.snow + (b.snow - a.snow) * s};
     emit changed();
 }

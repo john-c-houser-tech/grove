@@ -14,6 +14,7 @@
 #include "foghorn.h"
 #include "garden.h"
 #include "light.h"
+#include "notifier.h"
 #include "theme.h"
 #include "translator.h"
 #include "weather.h"
@@ -21,7 +22,7 @@
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName("grove");
-    app.setApplicationVersion("0.1.0");
+    app.setApplicationVersion("0.2.0");
 
     // Matches the window to grove.desktop, so the compositor (Wayland app_id)
     // and the launcher pick up the installed icon.
@@ -55,6 +56,7 @@ int main(int argc, char *argv[]) {
     Weather weather(qEnvironmentVariable("GROVE_WEATHER"));
     weather.begin(1 + QRandomGenerator::global()->bounded(1 << 30), today);
     FogHorn horn;
+    Notifier notifier;
 
     // GROVE_GARDEN points the garden at another file. A shortened test session
     // (GROVE_SECONDS) is not saved unless it does, so trying the app out never
@@ -68,6 +70,9 @@ int main(int argc, char *argv[]) {
         if (backend.state() == "growing")
             weather.begin(backend.seed(), today);
         updateHorn();
+        // A shortened test session stays quiet too, like it stays out of the garden.
+        if (backend.state() == "done" && saving)
+            notifier.plantGrown();
         if (saving && (backend.state() == "done" || backend.state() == "wilted")) {
             Garden::Plant plant;
             plant.seed = backend.seed();
@@ -92,6 +97,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("weather", &weather);
     engine.rootContext()->setContextProperty("horn", &horn);
     engine.rootContext()->setContextProperty("garden", &garden);
+    engine.rootContext()->setContextProperty("notifier", &notifier);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;
