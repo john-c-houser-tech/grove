@@ -1,6 +1,5 @@
 {
   "%1 grown · %2 wilted · %3": "%1 groet · %2 visnet · %3",
-  "Autumn": "Efterår",
   "Clear": "Klart",
   "Cloudy": "Skyet",
   "Fog": "Tåge",
@@ -19,11 +18,8 @@
   "Rain": "Regn",
   "Show or hide the garden": "Vis eller skjul haven",
   "Show or hide this help": "Vis eller skjul denne hjælp",
-  "Spring": "Forår",
-  "Summer": "Sommer",
   "The plant will wilt, and the garden keeps it.": "Planten visner, og haven beholder den.",
   "Wilted": "Visnet",
-  "Winter": "Vinter",
   "Could not create the garden folder, so this plant was not saved.": "Kunne ikke oprette havemappen, så denne plante blev ikke gemt.",
   "Could not open the garden file, so new plants will not be saved.": "Kunne ikke åbne havefilen, så nye planter bliver ikke gemt.",
   "Could not save the garden: %1": "Kunne ikke gemme haven: %1",

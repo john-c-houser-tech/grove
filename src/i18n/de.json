@@ -1,6 +1,5 @@
 {
   "%1 grown · %2 wilted · %3": "%1 gewachsen · %2 verwelkt · %3",
-  "Autumn": "Herbst",
   "Clear": "Klar",
   "Cloudy": "Bewölkt",
   "Fog": "Nebel",
@@ -19,11 +18,8 @@
   "Rain": "Regen",
   "Show or hide the garden": "Garten ein- oder ausblenden",
   "Show or hide this help": "Diese Hilfe ein- oder ausblenden",
-  "Spring": "Frühling",
-  "Summer": "Sommer",
   "The plant will wilt, and the garden keeps it.": "Die Pflanze verwelkt, und der Garten behält sie.",
   "Wilted": "Verwelkt",
-  "Winter": "Winter",
   "Could not create the garden folder, so this plant was not saved.": "Der Gartenordner konnte nicht erstellt werden, daher wurde diese Pflanze nicht gespeichert.",
   "Could not open the garden file, so new plants will not be saved.": "Die Gartendatei konnte nicht geöffnet werden, daher werden neue Pflanzen nicht gespeichert.",
   "Could not save the garden: %1": "Der Garten konnte nicht gespeichert werden: %1",

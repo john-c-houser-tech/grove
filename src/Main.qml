@@ -35,23 +35,6 @@ ApplicationWindow {
         return number(m) + ":" + (s < 10 ? number(0) : "") + number(s)
     }
 
-    function seasonName() {
-        switch (weather.season) {
-        case "spring": return qsTr("Spring")
-        case "summer": return qsTr("Summer")
-        case "autumn": return qsTr("Autumn")
-        default: return qsTr("Winter")
-        }
-    }
-    function weatherName() {
-        switch (weather.kind) {
-        case "cloudy": return qsTr("Cloudy")
-        case "rain": return qsTr("Rain")
-        case "snow": return qsTr("Snow")
-        case "fog": return qsTr("Fog")
-        default: return qsTr("Clear")
-        }
-    }
 
     function ask(action) {
         confirm.action = action
@@ -142,33 +125,29 @@ ApplicationWindow {
             ambient: light.ambient
         }
 
+        // Small and quiet, so the scene comes first.
         ColumnLayout {
             anchors.top: parent.top
-            anchors.topMargin: 24
+            anchors.topMargin: 18
             anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 4
+            spacing: 2
 
             Label {
                 Layout.alignment: Qt.AlignHCenter
                 text: backend.state === "idle" ? qsTr("%n minutes", "", backend.minutes)
                     : win.clock(backend.state === "growing" ? backend.remaining : 0)
-                font.pixelSize: 44
+                font.pixelSize: 24
                 font.weight: Font.Light
-                opacity: 0.92
+                opacity: 0.75
             }
             Label {
                 Layout.alignment: Qt.AlignHCenter
-                opacity: 0.6
+                opacity: 0.5
+                font.pixelSize: 12
                 text: backend.state === "idle" ? qsTr("Press Space to plant a seed")
                     : backend.state === "growing" ? qsTr("Growing. Stay with it.")
                     : backend.state === "done" ? qsTr("Fully grown. Space plants another.")
                     : qsTr("It wilted. Space tries again.")
-            }
-            Label {
-                Layout.alignment: Qt.AlignHCenter
-                opacity: 0.4
-                font.pixelSize: 12
-                text: win.seasonName() + " · " + win.weatherName()
             }
         }
 

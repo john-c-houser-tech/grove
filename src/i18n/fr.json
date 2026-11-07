@@ -1,6 +1,5 @@
 {
   "%1 grown · %2 wilted · %3": "%1 poussées · %2 fanées · %3",
-  "Autumn": "Automne",
   "Clear": "Dégagé",
   "Cloudy": "Nuageux",
   "Fog": "Brouillard",
@@ -19,11 +18,8 @@
   "Rain": "Pluie",
   "Show or hide the garden": "Afficher ou masquer le jardin",
   "Show or hide this help": "Afficher ou masquer cette aide",
-  "Spring": "Printemps",
-  "Summer": "Été",
   "The plant will wilt, and the garden keeps it.": "La plante va faner, et le jardin la garde.",
   "Wilted": "Fanée",
-  "Winter": "Hiver",
   "Could not create the garden folder, so this plant was not saved.": "Impossible de créer le dossier du jardin, cette plante n'a donc pas été enregistrée.",
   "Could not open the garden file, so new plants will not be saved.": "Impossible d'ouvrir le fichier du jardin, les nouvelles plantes ne seront donc pas enregistrées.",
   "Could not save the garden: %1": "Impossible d'enregistrer le jardin : %1",

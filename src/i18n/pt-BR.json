@@ -1,6 +1,5 @@
 {
   "%1 grown · %2 wilted · %3": "%1 crescidas · %2 murchas · %3",
-  "Autumn": "Outono",
   "Clear": "Limpo",
   "Cloudy": "Nublado",
   "Fog": "Neblina",
@@ -19,11 +18,8 @@
   "Rain": "Chuva",
   "Show or hide the garden": "Mostrar ou ocultar o jardim",
   "Show or hide this help": "Mostrar ou ocultar esta ajuda",
-  "Spring": "Primavera",
-  "Summer": "Verão",
   "The plant will wilt, and the garden keeps it.": "A planta vai murchar, e o jardim a guarda.",
   "Wilted": "Murcha",
-  "Winter": "Inverno",
   "Could not create the garden folder, so this plant was not saved.": "Não foi possível criar a pasta do jardim, então esta planta não foi salva.",
   "Could not open the garden file, so new plants will not be saved.": "Não foi possível abrir o arquivo do jardim, então novas plantas não serão salvas.",
   "Could not save the garden: %1": "Não foi possível salvar o jardim: %1",
