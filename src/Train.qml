@@ -244,83 +244,43 @@ Item {
                 ctx.lineTo(topPt.x + (footPt.x - topPt.x) * 0.7 + 1, topPt.y + (footPt.y - topPt.y) * 0.75)
                 ctx.stroke()
             }
-            // The hillside above the cut lies farther up the slope and turns a
-            // little away from us, so it is a shade darker than the slope below
-            // the road. It runs up to the skyline of the ridge.
-            function hash(i, seed) {
-                var v = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
-                return v - Math.floor(v)
-            }
-            function noise(v, seed) {
-                var i = Math.floor(v), f = v - i
-                var u = f * f * (3 - 2 * f)
-                return hash(i, seed) * (1 - u) + hash(i + 1, seed) * u
-            }
-            // The same ridge line as the hills draw (Hills.qml, mid()).
-            function ridgeY(px) {
-                var u = px / W
-                var shoulder = (u - 0.6) / 0.12
-                var rise = H * (0.035 + 0.15 * noise(u * 2.6 + 5, 4)) + H * 0.025 * noise(u * 8.2, 5)
-                           + H * 0.07 * Math.exp(-shoulder * shoulder)
-                return H * root.horizon - rise
-            }
+            // A nearer hill stands on the left, taller than the one the road
+            // climbs. Its top runs off the left edge; its right flank comes
+            // steeply down across the farther hill and the road's last stretch,
+            // so the road passes out of sight behind it. Being nearer, it is
+            // darker and less hazy than the hill behind.
             var bend = curve(far0, far1, far2, far3, 0.86)
-            var span = H * 0.034
-            // The edge of the shoulder: a rounded hill seen from here shows a
-            // convex edge, bulging toward us, from the skyline down across the
-            // road's last stretch. The road wraps round the outside of it and
-            // passes out of sight behind.
-            var foldTop = { x: bend.x - W * 0.004, y: ridgeY(bend.x - W * 0.004) + 1 }
-            var fold3 = { x: bend.x - W * 0.008, y: bend.y + span * 0.6 }
-            var fold1 = { x: bend.x + W * 0.03, y: foldTop.y + (fold3.y - foldTop.y) * 0.3 }
-            var fold2 = { x: bend.x + W * 0.03, y: foldTop.y + (fold3.y - foldTop.y) * 0.78 }
-            function traceFold() {
-                ctx.bezierCurveTo(fold1.x, fold1.y, fold2.x, fold2.y, fold3.x, fold3.y)
-            }
-
-            // The slope above the cut, darker, fading out toward the crossing so
-            // it has no edge there; its left side is hidden under the flank.
-            var leftX = bend.x - W * 0.02, rightX = cutTop[0].x
-            var shade = ctx.createLinearGradient(rightX - W * 0.06, 0, rightX + W * 0.02, 0)
-            shade.addColorStop(0, Qt.rgba(0.02, 0.03, 0.03, 0.15))
-            shade.addColorStop(1, Qt.rgba(0.02, 0.03, 0.03, 0))
-            ctx.fillStyle = shade
-            ctx.beginPath()
-            ctx.moveTo(cutTop[0].x, cutTop[0].y)
-            for (var d2 = 1; d2 < cutTop.length; d2++)
-                ctx.lineTo(cutTop[d2].x, cutTop[d2].y)
-            ctx.lineTo(leftX, cutTop[cutTop.length - 1].y)
-            for (var sx = leftX; sx <= rightX + W * 0.02; sx += 3)
-                ctx.lineTo(sx, ridgeY(sx) + 1)
-            ctx.closePath()
-            ctx.fill()
-
-            // Where the road curves around the shoulder, the near flank of the
-            // hill comes across it, and it passes out of sight. The flank runs
-            // up to the skyline, coloured exactly as the hillside around it:
-            // fading toward the sky colour at its foot, as the ridges are painted.
             var y0 = H * root.horizon
-            var flank = ctx.createLinearGradient(0, y0 - H * 0.2, 0, y0 + 2)
-            flank.addColorStop(0, root.hillColor)
-            flank.addColorStop(1, Qt.rgba(root.hillColor.r + (root.hazeColor.r - root.hillColor.r) * 0.4,
-                                          root.hillColor.g + (root.hazeColor.g - root.hillColor.g) * 0.4,
-                                          root.hillColor.b + (root.hazeColor.b - root.hillColor.b) * 0.4, 1))
-            ctx.fillStyle = flank
-            var farLeft = bend.x - W * 0.08
+            var crest = y0 - H * 0.235
+            var shoulderX = bend.x - W * 0.15
+            var near = ctx.createLinearGradient(0, crest, 0, cy)
+            var nearTop = Qt.darker(root.hillColor, 1.12)
+            near.addColorStop(0, nearTop)
+            near.addColorStop(1, Qt.rgba(nearTop.r + (root.hazeColor.r - nearTop.r) * 0.25,
+                                         nearTop.g + (root.hazeColor.g - nearTop.g) * 0.25,
+                                         nearTop.b + (root.hazeColor.b - nearTop.b) * 0.25, 1))
+            function nearHillOutline() {
+                ctx.moveTo(-2, crest + H * 0.012)
+                // A broad rounded top, a little uneven.
+                ctx.bezierCurveTo(W * 0.1, crest - H * 0.004, shoulderX - W * 0.12, crest - H * 0.006, shoulderX, crest)
+                // The flank: rounding over, then steep, down to the road's end.
+                ctx.bezierCurveTo(shoulderX + W * 0.07, crest + H * 0.004,
+                                  bend.x - W * 0.012, bend.y - H * 0.06,
+                                  bend.x + W * 0.004, bend.y + H * 0.008)
+                // Its foot reaches the valley floor just beyond the road.
+                ctx.quadraticCurveTo(bend.x + W * 0.012, cy - H * 0.006, bend.x + W * 0.03, cy + 1)
+            }
+            ctx.fillStyle = near
             ctx.beginPath()
-            ctx.moveTo(foldTop.x, foldTop.y)
-            traceFold()
-            ctx.lineTo(farLeft, fold3.y)
-            for (var fx = farLeft; fx <= foldTop.x; fx += 3)
-                ctx.lineTo(fx, ridgeY(fx) + 1)
+            nearHillOutline()
+            ctx.lineTo(-2, cy + 1)
             ctx.closePath()
             ctx.fill()
-            // A soft shadow along the fold.
-            ctx.strokeStyle = Qt.darker(root.hillColor, 1.12)
-            ctx.lineWidth = Math.max(1, H * 0.002)
+            // A faint line where the near hill's edge stands against the far one.
+            ctx.strokeStyle = Qt.darker(nearTop, 1.15)
+            ctx.lineWidth = Math.max(1, H * 0.0018)
             ctx.beginPath()
-            ctx.moveTo(foldTop.x, foldTop.y)
-            traceFold()
+            nearHillOutline()
             ctx.stroke()
             // Ballast, then a rail catching what light there is on top of it.
             line()
