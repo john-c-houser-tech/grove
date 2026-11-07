@@ -461,6 +461,19 @@ private slots:
         QVERIFY(direction == 1 || direction == -1);
     }
 
+    void endingASessionFadesOutWhatIsPassing()
+    {
+        Sounds sounds(false, "train");
+        QSignalSpy fading(&sounds, &Sounds::fadingOut);
+        QSignalSpy trains(&sounds, &Sounds::trainPassing);
+        sounds.begin(60);
+        sounds.end();
+        QCOMPARE(fading.count(), 2);
+        // The train due three seconds in never comes.
+        QTest::qWait(3500);
+        QCOMPARE(trains.count(), 0);
+    }
+
     void aTrainShowsEvenWhenMuted()
     {
         Sounds sounds(false, "train");
@@ -513,6 +526,40 @@ private slots:
         QCOMPARE(again.data(again.index(2), Garden::SeedRole).toInt(), 11);
         QCOMPARE(again.focusedMinutes(), 50);
         QVERIFY(again.problem().isEmpty());
+    }
+
+    void twoGrovesOpenTogetherKeepEachOthersPlants()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("garden.json");
+        Garden first(path), second(path);
+        first.record(plant(11, "done", 1.0, 25));
+        // The second read the garden before the first saved its plant.
+        second.record(plant(22, "wilted", 0.4, 0));
+        QCOMPARE(second.rowCount(), 2);
+        QCOMPARE(second.data(second.index(0), Garden::SeedRole).toInt(), 22);
+        QCOMPARE(second.data(second.index(1), Garden::SeedRole).toInt(), 11);
+        first.record(plant(33, "done", 1.0, 25));
+        Garden again(path);
+        QCOMPARE(again.rowCount(), 3);
+        QCOMPARE(again.focusedMinutes(), 50);
+        QVERIFY(!QFile::exists(path + ".lock"));
+    }
+
+    void aGardenSpoiledWhileOpenIsNotSavedOver()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("garden.json");
+        Garden garden(path);
+        garden.record(plant(11, "done", 1.0, 25));
+        write(path, "this is not json");
+        garden.record(plant(22, "done", 1.0, 25));
+        QVERIFY(!garden.problem().isEmpty());
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("this is not json"));
+        // The plant is still shown, though it could not be kept.
+        QCOMPARE(garden.rowCount(), 2);
     }
 
     void unreadableGardenIsLeftUntouched()

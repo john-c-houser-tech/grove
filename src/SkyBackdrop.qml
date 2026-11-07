@@ -202,6 +202,7 @@ Item {
     Connections {
         target: sounds
         function onTrainPassing(milliseconds) { train.go(milliseconds) }
+        function onFadingOut() { train.leave(); plane.leave() }
     }
 
     Hills {

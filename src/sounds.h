@@ -38,7 +38,9 @@ public:
     // Whether the weather lets a plane be seen and heard.
     void setFlightWeatherOk(std::function<bool()> ok) { m_flightWeatherOk = std::move(ok); }
 
-    // A session of this many seconds starts, or stops.
+    // A session of this many seconds starts, or stops. Stopping fades out a
+    // sound under way and drops one still waiting to start: the distant
+    // sounds belong to a growing plant.
     void begin(int sessionSeconds);
     void end();
 
@@ -62,6 +64,9 @@ signals:
     void planeFlyover(int direction, int milliseconds, double altitude);
     // A train runs across the valley, timed to the sound that lasts this long.
     void trainPassing(int milliseconds);
+    // The session has ended, so a train or plane still passing fades away
+    // with its sound.
+    void fadingOut();
 
 private:
     void fire(const QString &kind);
@@ -83,4 +88,9 @@ private:
     QByteArray m_playing;
     QBuffer m_buffer;
     QAudioSink *m_sink = nullptr;
+    // Counts sessions, so a sound still waiting to be made when its session
+    // ends is not played in the next.
+    int m_session = 0;
+    QTimer m_fade;
+    double m_fadeStep = 0;
 };

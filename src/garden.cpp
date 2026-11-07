@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLockFile>
 #include <QSaveFile>
 #include <QStandardPaths>
 
@@ -64,45 +65,53 @@ void Garden::recount() {
     emit countsChanged();
 }
 
-void Garden::load() {
+Garden::Read Garden::read(std::vector<Plant> &plants) const {
     QFile file(m_path);
     if (!file.exists())
-        return;
-    if (!file.open(QIODevice::ReadOnly)) {
-        m_readOnly = true;
-        setProblem(tr("Could not open the garden file, so new plants will not be saved."));
-        return;
-    }
+        return Read::Missing;
+    if (!file.open(QIODevice::ReadOnly))
+        return Read::Unreadable;
     QJsonParseError error;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
     const QJsonValue list = document.object().value("plants");
-    std::vector<Plant> plants;
-    bool valid = error.error == QJsonParseError::NoError && list.isArray();
-    if (valid) {
-        // On disk the oldest plant comes first; the model wants newest first.
-        const QJsonArray array = list.toArray();
-        for (const QJsonValue &value : array) {
-            const QJsonObject o = value.toObject();
-            Plant p;
-            p.seed = o.value("seed").toInt(-1);
-            p.outcome = o.value("outcome").toString();
-            p.season = o.value("season").toString();
-            p.weather = o.value("weather").toString();
-            p.progress = o.value("progress").toDouble(-1);
-            p.when = QDateTime::fromString(o.value("when").toString(), Qt::ISODate);
-            p.minutes = o.value("minutes").toInt(-1);
-            if (p.seed < 0 || (p.outcome != "done" && p.outcome != "wilted") || p.progress < 0 || p.progress > 1
-                || !p.when.isValid() || p.minutes < 0) {
-                valid = false;
-                break;
-            }
-            plants.insert(plants.begin(), p);
-        }
+    if (error.error != QJsonParseError::NoError || !list.isArray())
+        return Read::Invalid;
+    // On disk the oldest plant comes first; the model wants newest first.
+    plants.clear();
+    const QJsonArray array = list.toArray();
+    for (const QJsonValue &value : array) {
+        const QJsonObject o = value.toObject();
+        Plant p;
+        p.seed = o.value("seed").toInt(-1);
+        p.outcome = o.value("outcome").toString();
+        p.season = o.value("season").toString();
+        p.weather = o.value("weather").toString();
+        p.progress = o.value("progress").toDouble(-1);
+        p.when = QDateTime::fromString(o.value("when").toString(), Qt::ISODate);
+        p.minutes = o.value("minutes").toInt(-1);
+        if (p.seed < 0 || (p.outcome != "done" && p.outcome != "wilted") || p.progress < 0 || p.progress > 1
+            || !p.when.isValid() || p.minutes < 0)
+            return Read::Invalid;
+        plants.insert(plants.begin(), p);
     }
-    if (!valid) {
+    return Read::Ok;
+}
+
+void Garden::load() {
+    std::vector<Plant> plants;
+    switch (read(plants)) {
+    case Read::Missing:
+        return;
+    case Read::Unreadable:
+        m_readOnly = true;
+        setProblem(tr("Could not open the garden file, so new plants will not be saved."));
+        return;
+    case Read::Invalid:
         m_readOnly = true;
         setProblem(tr("The garden file could not be read. It was left untouched, and new plants will not be saved."));
         return;
+    case Read::Ok:
+        break;
     }
     beginResetModel();
     m_plants = std::move(plants);
@@ -128,10 +137,6 @@ bool Garden::save() {
     root["version"] = 1;
     root["plants"] = array;
 
-    if (!QDir().mkpath(QFileInfo(m_path).absolutePath())) {
-        setProblem(tr("Could not create the garden folder, so this plant was not saved."));
-        return false;
-    }
     // QSaveFile writes beside the target and renames, so a crash mid-write
     // never leaves half a garden.
     QSaveFile file(m_path);
@@ -144,11 +149,49 @@ bool Garden::save() {
 }
 
 void Garden::record(const Plant &plant) {
-    beginInsertRows({}, 0, 0);
-    m_plants.insert(m_plants.begin(), plant);
-    endInsertRows();
-    recount();
-    if (m_readOnly)
+    const auto keepUnsaved = [this, &plant] {
+        beginInsertRows({}, 0, 0);
+        m_plants.insert(m_plants.begin(), plant);
+        endInsertRows();
+        recount();
+    };
+    if (m_readOnly) {
+        keepUnsaved();
         return;
+    }
+    if (!QDir().mkpath(QFileInfo(m_path).absolutePath())) {
+        keepUnsaved();
+        setProblem(tr("Could not create the garden folder, so this plant was not saved."));
+        return;
+    }
+    // Another Grove may be open on the same garden. Only one saves at a time,
+    // and each starts from the file as it is now, so neither drops the
+    // plants the other has saved since it was read.
+    QLockFile lock(m_path + ".lock");
+    if (!lock.tryLock(5000)) {
+        keepUnsaved();
+        setProblem(tr("Another Grove kept the garden busy, so this plant was not saved."));
+        return;
+    }
+    std::vector<Plant> plants;
+    switch (read(plants)) {
+    case Read::Missing:
+        plants.clear();
+        break;
+    case Read::Ok:
+        break;
+    case Read::Unreadable:
+    case Read::Invalid:
+        // Changed into something that cannot be read since: leave it be.
+        m_readOnly = true;
+        keepUnsaved();
+        setProblem(tr("The garden file could not be read. It was left untouched, and new plants will not be saved."));
+        return;
+    }
+    plants.insert(plants.begin(), plant);
+    beginResetModel();
+    m_plants = std::move(plants);
+    endResetModel();
+    recount();
     save();
 }

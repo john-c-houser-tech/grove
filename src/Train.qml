@@ -54,8 +54,11 @@ Item {
     // Where the front of the train is, as a fraction of the width. It runs
     // right to left.
     readonly property real headX: crossingX - speed * (seconds - atCrossing)
+    // 1 through a pass. When the session ends mid-pass it eases to 0 and the
+    // train goes with its sound.
+    property real presence: 1
     // Lights come up and go down gently at either end.
-    readonly property real fade: Math.max(0, Math.min(1, seconds / 3, (totalMilliseconds / 1000 - seconds) / 3))
+    readonly property real fade: presence * Math.max(0, Math.min(1, seconds / 3, (totalMilliseconds / 1000 - seconds) / 3))
     // The diesel's ditch lights flash while its horn sounds for the crossing.
     readonly property bool horning: (seconds >= 3 && seconds <= 12) || (seconds >= 16 && seconds <= 26.5)
 
@@ -68,12 +71,30 @@ Item {
         easing.type: Easing.Linear
         onStopped: root.running = false
     }
+    NumberAnimation {
+        id: leaving
+        target: root
+        property: "presence"
+        to: 0
+        duration: 1500
+        onFinished: run.stop()
+    }
 
     function go(milliseconds) {
+        leaving.stop()
+        presence = 1
         totalMilliseconds = milliseconds
-        running = true
         run.duration = milliseconds
+        // Restarting a run under way stops it first, which clears `running`,
+        // so it is set after.
         run.restart()
+        running = true
+    }
+
+    // Fades out a train still passing.
+    function leave() {
+        if (running)
+            leaving.start()
     }
 
     // Freezes the train at a point in its run, for looking at it.

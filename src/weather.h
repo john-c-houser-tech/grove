@@ -25,6 +25,7 @@ public:
 
     // A kind name ("clear", "cloudy", "rain", "snow" or "fog") pins the weather, for
     // screenshots and tests; the empty string lets it roll. Snow only rolls in winter.
+    // Until begin() rolls a session's weather, the sky is clear, or as pinned.
     explicit Weather(const QString &forcedKind = {}, QObject *parent = nullptr);
 
     // The dominant weather right now.

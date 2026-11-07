@@ -208,6 +208,17 @@ QList<double> Sounds::eventTimes(QRandomGenerator &random, int count, double ses
 
 Sounds::Sounds(bool persist, const QString &forcedKind, QObject *parent)
     : QObject(parent), m_persist(persist), m_forced(forcedKind == "train" || forcedKind == "plane" ? forcedKind : QString()) {
+    m_fade.setInterval(30);
+    connect(&m_fade, &QTimer::timeout, this, [this] {
+        const double volume = m_sink ? m_sink->volume() - m_fadeStep : 0;
+        if (volume <= 0.001) {
+            m_fade.stop();
+            if (m_sink)
+                m_sink->stop();
+            return;
+        }
+        m_sink->setVolume(volume);
+    });
     if (m_persist)
         m_muted = QSettings("grove", "grove").value("muted", false).toBool();
     // GROVE_SOUND_VOLUME scales the volume from 0 to 1, so the sound path can
@@ -230,8 +241,10 @@ void Sounds::setMuted(bool muted) {
     m_muted = muted;
     if (m_persist)
         QSettings("grove", "grove").setValue("muted", muted);
-    if (muted && m_sink)
+    if (muted && m_sink) {
+        m_fade.stop();
         m_sink->stop();
+    }
     emit mutedChanged();
 }
 
@@ -284,10 +297,17 @@ void Sounds::begin(int sessionSeconds) {
 }
 
 void Sounds::end() {
-    // A sound already under way is left to finish.
     for (QTimer &timer : m_timers)
         timer.stop();
     m_timers.clear();
+    ++m_session;
+    // A sound under way fades out over a second and a half rather than
+    // stopping with a click, and what goes with it fades too.
+    if (m_sink && m_sink->state() == QAudio::ActiveState && !m_fade.isActive()) {
+        m_fadeStep = m_sink->volume() / 50;
+        m_fade.start();
+    }
+    emit fadingOut();
 }
 
 void Sounds::fire(const QString &kind) {
@@ -317,12 +337,21 @@ void Sounds::showVisual(const QString &kind) {
 void Sounds::play(const QString &kind, int retries) {
     if (m_sink && m_sink->state() == QAudio::ActiveState)
         return;
+    // Muted while the sound was being made: the picture still goes.
+    if (m_muted) {
+        showVisual(kind);
+        return;
+    }
     prepare(kind);
     QFuture<QByteArray> &future = kind == "train" ? m_train : m_plane;
     if (!future.isFinished()) {
-        // Still being made; try again in a moment rather than miss it.
+        // Still being made; try again in a moment rather than miss it, unless
+        // the session is over by then.
         if (retries > 0)
-            QTimer::singleShot(1000, this, [this, kind, retries] { play(kind, retries - 1); });
+            QTimer::singleShot(1000, this, [this, kind, retries, session = m_session] {
+                if (session == m_session)
+                    play(kind, retries - 1);
+            });
         else
             showVisual(kind);
         return;
@@ -346,6 +375,7 @@ void Sounds::play(const QString &kind, int retries) {
         m_sink = new QAudioSink(device, format, this);
     }
     setProblem({});
+    m_fade.stop();
     m_sink->setVolume((kind == "train" ? 0.45 : 0.3) * m_volumeScale);
     m_playing = future.result();
     m_buffer.close();

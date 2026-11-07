@@ -16,6 +16,10 @@ Item {
 
     readonly property real span: Math.min(width, height) * 0.05
     visible: flying
+    // 1 through a flight. When the session ends mid-flight it eases to 0 and
+    // the plane goes with its sound.
+    property real presence: 1
+    opacity: presence
 
     NumberAnimation {
         id: flight
@@ -26,13 +30,31 @@ Item {
         easing.type: Easing.Linear
         onStopped: root.flying = false
     }
+    NumberAnimation {
+        id: leaving
+        target: root
+        property: "presence"
+        to: 0
+        duration: 1500
+        onFinished: flight.stop()
+    }
 
     function fly(dir, milliseconds, high) {
+        leaving.stop()
+        presence = 1
         direction = dir
         altitude = high
         flight.duration = milliseconds
-        flying = true
+        // Restarting a flight under way stops it first, which clears `flying`,
+        // so it is set after.
         flight.restart()
+        flying = true
+    }
+
+    // Fades out a plane still in the sky.
+    function leave() {
+        if (flying)
+            leaving.start()
     }
 
     Canvas {

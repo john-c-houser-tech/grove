@@ -61,15 +61,16 @@ int main(int argc, char *argv[]) {
     // GROVE_WEATHER=clear|cloudy|rain|fog pins the weather, to see any of them.
     const QTime forcedTime = QTime::fromString(qEnvironmentVariable("GROVE_TIME"), "HH:mm");
     const QDate forcedDate = QDate::fromString(qEnvironmentVariable("GROVE_DATE"), Qt::ISODate);
-    const QDate today = forcedDate.isValid() ? forcedDate : QDate::currentDate();
+    // Read afresh for each session, since Grove may stay open for days.
+    const auto today = [forcedDate] { return forcedDate.isValid() ? forcedDate : QDate::currentDate(); };
     Light light(forcedTime.isValid() || forcedDate.isValid()
-                    ? QDateTime(today, forcedTime.isValid() ? forcedTime : QTime::currentTime())
+                    ? QDateTime(today(), forcedTime.isValid() ? forcedTime : QTime::currentTime())
                     : QDateTime());
     light.setAccent(QColor(theme.accent()));
     QObject::connect(&theme, &Theme::changed, &light, [&] { light.setAccent(QColor(theme.accent())); });
 
     Weather weather(qEnvironmentVariable("GROVE_WEATHER"));
-    weather.begin(1 + QRandomGenerator::global()->bounded(1 << 30), today);
+    weather.begin(1 + QRandomGenerator::global()->bounded(1 << 30), today());
     // GROVE_SOUND_TEST=train or plane makes that sound happen a few seconds into
     // the next session, whatever the hour.
     Sounds sounds(true, qEnvironmentVariable("GROVE_SOUND_TEST"));
@@ -92,7 +93,7 @@ int main(int argc, char *argv[]) {
     // A new session rolls new weather; the plant's progress carries it along.
     QObject::connect(&backend, &Backend::stateChanged, &weather, [&] {
         if (backend.state() == "growing")
-            weather.begin(backend.seed(), today);
+            weather.begin(backend.seed(), today());
         if (backend.state() == "growing")
             sounds.begin(backend.seconds());
         else

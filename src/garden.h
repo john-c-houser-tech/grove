@@ -51,6 +51,9 @@ signals:
     void problemChanged();
 
 private:
+    enum class Read { Missing, Ok, Unreadable, Invalid };
+    // Reads the file as it is now, newest plant first.
+    Read read(std::vector<Plant> &plants) const;
     void load();
     bool save();
     void setProblem(const QString &problem);

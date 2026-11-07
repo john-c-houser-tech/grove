@@ -66,7 +66,8 @@ Rectangle {
             visible: count > 0
             clip: true
             model: garden
-            focus: root.visible
+            // It is made each time the garden opens, and takes the keys then.
+            Component.onCompleted: forceActiveFocus()
             keyNavigationEnabled: true
             ScrollBar.vertical: ScrollBar {}
 

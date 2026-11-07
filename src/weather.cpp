@@ -18,7 +18,9 @@ bool known(const QString &kind) {
 
 Weather::Weather(const QString &forcedKind, QObject *parent)
     : QObject(parent), m_forced(known(forcedKind) ? forcedKind : QString()) {
-    begin(QRandomGenerator::global()->bounded(1, 1 << 30), QDate::currentDate());
+    if (!m_forced.isEmpty())
+        m_from = m_to = m_forced;
+    m_now = at(0);
 }
 
 Weather::Conditions Weather::conditions(const QString &kind) {

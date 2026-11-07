@@ -229,9 +229,12 @@ ApplicationWindow {
             font.pixelSize: 12
         }
 
-        GardenView {
+        // Made only while it is open, so the tiles and their pictures are not
+        // kept the rest of the time.
+        Loader {
             anchors.fill: parent
-            visible: win.gardenVisible
+            active: win.gardenVisible
+            sourceComponent: GardenView {}
         }
 
         // Shortcut overlay.
