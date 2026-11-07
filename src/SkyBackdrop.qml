@@ -217,5 +217,6 @@ Item {
         cover: weather.cloud
         rain: weather.rain
         ambient: light.ambient
+        sky: light.skyTop
     }
 }

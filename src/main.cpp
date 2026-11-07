@@ -22,7 +22,7 @@
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName("grove");
-    app.setApplicationVersion("0.8.1");
+    app.setApplicationVersion("0.8.2");
 
     // Matches the window to grove.desktop, so the compositor (Wayland app_id)
     // and the launcher pick up the installed icon.

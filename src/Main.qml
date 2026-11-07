@@ -139,6 +139,7 @@ ApplicationWindow {
             rain: weather.rain
             snow: weather.snow
             fog: weather.fog
+            sky: light.skyTop
             ambient: light.ambient
         }
 

@@ -10,8 +10,15 @@ Item {
     property real fog: 0
     property real snow: 0
     property real ambient: 1
-    // Fog is grey-blue in the dark and pale grey by day.
-    readonly property color fogColor: Qt.rgba(0.2 + 0.58 * ambient, 0.23 + 0.58 * ambient, 0.28 + 0.56 * ambient, 1)
+    // The sky colour overhead (see Clouds.qml): fog is near-white by day and,
+    // as the light fails, a grey that takes the sky's cool cast, never brown.
+    property color sky: "#3d6f9c"
+    readonly property real level: 0.26 + 0.66 * ambient
+    readonly property real cast: Math.max(0, Math.min(0.6, 0.8 * (1 - ambient) / 0.78))
+    readonly property real skyMean: (sky.r + sky.g + sky.b) / 3
+    readonly property color fogColor: Qt.rgba(Math.max(0, Math.min(1, level * 0.97 + cast * (sky.r - skyMean))),
+                                              Math.max(0, Math.min(1, level * 0.99 + cast * (sky.g - skyMean))),
+                                              Math.max(0, Math.min(1, level + 0.02 + cast * (sky.b - skyMean))), 1)
 
     ParticleSystem {
         id: system

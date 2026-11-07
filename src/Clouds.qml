@@ -19,10 +19,25 @@ Item {
         running: root.cover > 0.02
     }
 
-    readonly property real shade: (0.2 + 0.72 * ambient) * (1 - 0.4 * rain)
-    readonly property color cloudColor: Qt.rgba(shade * 0.95, shade * 0.97, shade, 1)
-    // The underside of a cloud is always a little darker than its top.
-    readonly property color cloudShade: Qt.rgba(shade * 0.62, shade * 0.68, shade * 0.78, 1)
+    // The sky colour overhead. In low light a cloud is lit mostly by the sky,
+    // so it takes on the sky's cool cast; a plain grey beside a blue or violet
+    // sky reads as brown, like smog.
+    property color sky: "#3d6f9c"
+
+    // White in full daylight, grey as the light fails, darker in rain.
+    readonly property real shade: (0.24 + 0.73 * ambient) * (1 - 0.4 * rain)
+    // How much of the sky's hue the cloud carries: none at midday, all of it at night.
+    readonly property real cast: Math.max(0, Math.min(0.6, 0.8 * (1 - ambient) / 0.78))
+    readonly property real skyMean: (sky.r + sky.g + sky.b) / 3
+    function clamp01(v) { return Math.max(0, Math.min(1, v)) }
+    function lit(level) {
+        return Qt.rgba(clamp01(level * 0.98 + cast * (sky.r - skyMean)),
+                       clamp01(level * 0.99 + cast * (sky.g - skyMean)),
+                       clamp01(level + cast * (sky.b - skyMean)), 1)
+    }
+    readonly property color cloudColor: lit(shade)
+    // The underside of a cloud is always a little darker, and bluer, than its top.
+    readonly property color cloudShade: Qt.rgba(cloudColor.r * 0.66, cloudColor.g * 0.71, cloudColor.b * 0.8, 1)
 
     Repeater {
         model: 9
