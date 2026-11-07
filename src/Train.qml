@@ -244,12 +244,61 @@ Item {
                 ctx.lineTo(topPt.x + (footPt.x - topPt.x) * 0.7 + 1, topPt.y + (footPt.y - topPt.y) * 0.75)
                 ctx.stroke()
             }
-            // Where the road curves around the shoulder, the near flank of the
-            // hill comes across it, and it passes out of sight.
+            // The hillside above the cut lies farther up the slope and turns a
+            // little away from us, so it is a shade darker than the slope below
+            // the road. It runs up to the skyline of the ridge.
+            function hash(i, seed) {
+                var v = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
+                return v - Math.floor(v)
+            }
+            function noise(v, seed) {
+                var i = Math.floor(v), f = v - i
+                var u = f * f * (3 - 2 * f)
+                return hash(i, seed) * (1 - u) + hash(i + 1, seed) * u
+            }
+            // The same ridge line as the hills draw (Hills.qml, mid()).
+            function ridgeY(px) {
+                var u = px / W
+                var shoulder = (u - 0.6) / 0.12
+                var rise = H * (0.035 + 0.15 * noise(u * 2.6 + 5, 4)) + H * 0.025 * noise(u * 8.2, 5)
+                           + H * 0.07 * Math.exp(-shoulder * shoulder)
+                return H * root.horizon - rise
+            }
             var bend = curve(far0, far1, far2, far3, 0.86)
             var span = H * 0.034
-            // Coloured exactly as the hillside around it is: fading toward the
-            // sky colour at its foot, as the ridges behind are painted.
+            // The fold of the shoulder: from the skyline down across the road's
+            // last stretch, curving as the hill rounds away from us.
+            var foldTop = { x: bend.x + W * 0.022, y: ridgeY(bend.x + W * 0.022) + 1 }
+            var fold0 = { x: bend.x + W * 0.012, y: bend.y - span }
+            var fold1 = { x: bend.x - W * 0.004, y: bend.y - span * 0.4 }
+            var fold2 = { x: bend.x - W * 0.002, y: bend.y + span * 0.2 }
+            var fold3 = { x: bend.x + W * 0.006, y: bend.y + span * 0.55 }
+            function traceFold() {
+                ctx.lineTo(fold0.x, fold0.y)
+                ctx.bezierCurveTo(fold1.x, fold1.y, fold2.x, fold2.y, fold3.x, fold3.y)
+            }
+
+            // The slope above the cut, darker, fading out toward the crossing so
+            // it has no edge there; its left side is hidden under the flank.
+            var leftX = bend.x - W * 0.02, rightX = cutTop[0].x
+            var shade = ctx.createLinearGradient(rightX - W * 0.06, 0, rightX + W * 0.02, 0)
+            shade.addColorStop(0, Qt.rgba(0.02, 0.03, 0.03, 0.15))
+            shade.addColorStop(1, Qt.rgba(0.02, 0.03, 0.03, 0))
+            ctx.fillStyle = shade
+            ctx.beginPath()
+            ctx.moveTo(cutTop[0].x, cutTop[0].y)
+            for (var d2 = 1; d2 < cutTop.length; d2++)
+                ctx.lineTo(cutTop[d2].x, cutTop[d2].y)
+            ctx.lineTo(leftX, cutTop[cutTop.length - 1].y)
+            for (var sx = leftX; sx <= rightX + W * 0.02; sx += 3)
+                ctx.lineTo(sx, ridgeY(sx) + 1)
+            ctx.closePath()
+            ctx.fill()
+
+            // Where the road curves around the shoulder, the near flank of the
+            // hill comes across it, and it passes out of sight. The flank runs
+            // up to the skyline, coloured exactly as the hillside around it:
+            // fading toward the sky colour at its foot, as the ridges are painted.
             var y0 = H * root.horizon
             var flank = ctx.createLinearGradient(0, y0 - H * 0.2, 0, y0 + 2)
             flank.addColorStop(0, root.hillColor)
@@ -257,21 +306,21 @@ Item {
                                           root.hillColor.g + (root.hazeColor.g - root.hillColor.g) * 0.4,
                                           root.hillColor.b + (root.hazeColor.b - root.hillColor.b) * 0.4, 1))
             ctx.fillStyle = flank
+            var farLeft = bend.x - W * 0.08
             ctx.beginPath()
-            ctx.moveTo(bend.x + W * 0.012, bend.y - span)
-            ctx.bezierCurveTo(bend.x - W * 0.004, bend.y - span * 0.4, bend.x - W * 0.002, bend.y + span * 0.2,
-                              bend.x + W * 0.006, bend.y + span * 0.55)
-            ctx.lineTo(bend.x - W * 0.08, bend.y + span * 0.55)
-            ctx.lineTo(bend.x - W * 0.08, bend.y - span)
+            ctx.moveTo(foldTop.x, foldTop.y)
+            traceFold()
+            ctx.lineTo(farLeft, fold3.y)
+            for (var fx = farLeft; fx <= foldTop.x; fx += 3)
+                ctx.lineTo(fx, ridgeY(fx) + 1)
             ctx.closePath()
             ctx.fill()
-            // A soft shadow along the fold of the shoulder.
+            // A soft shadow along the fold.
             ctx.strokeStyle = Qt.darker(root.hillColor, 1.12)
             ctx.lineWidth = Math.max(1, H * 0.002)
             ctx.beginPath()
-            ctx.moveTo(bend.x + W * 0.012, bend.y - span)
-            ctx.bezierCurveTo(bend.x - W * 0.004, bend.y - span * 0.4, bend.x - W * 0.002, bend.y + span * 0.2,
-                              bend.x + W * 0.006, bend.y + span * 0.55)
+            ctx.moveTo(foldTop.x, foldTop.y)
+            traceFold()
             ctx.stroke()
             // Ballast, then a rail catching what light there is on top of it.
             line()

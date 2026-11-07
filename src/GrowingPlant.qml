@@ -74,6 +74,9 @@ Canvas {
     // takes an equal share of the rest, so the last twigs finish as time ends.
     function build() {
         var r = random(seed)
+        // The bow of each stem comes from a generator of its own, so adding it
+        // left every plant's branching exactly as it was.
+        var bends = random((seed ^ 0x5bd1e995) >>> 0)
         var segs = [], ends = []
         var maxDepth = 6
         var unit = height
@@ -91,8 +94,18 @@ Canvas {
                 for (var i = 0; i < count; i++)
                     leaves.push({ f: 0.35 + r() * 0.6, side: r() < 0.5 ? -1 : 1, size: 0.75 + r() * 0.5, tone: r() })
             }
-            segs.push({ x: x, y: y, ex: ex, ey: ey, t0: t0, t1: t1,
-                        width: Math.max(1.4 * scale, 9 * scale * Math.pow(0.62, depth)), leaves: leaves })
+            // No stem grows dead straight: each one bows a little to one side,
+            // the main stem least. The control point sits off the middle.
+            var lean = bends()
+            var bow = depth === 0
+                    ? (lean < 0.5 ? -1 : 1) * (0.05 + 0.06 * Math.abs(lean - 0.5) * 2) * length
+                    : (lean - 0.5) * 0.22 * length
+            var cx = (x + ex) / 2 - Math.sin(angle) * bow
+            var cy = (y + ey) / 2 + Math.cos(angle) * bow
+            var w = Math.max(1.4 * scale, 9 * scale * Math.pow(0.62, depth))
+            // The main stem and first branches thin toward their tips.
+            segs.push({ x: x, y: y, cx: cx, cy: cy, ex: ex, ey: ey, t0: t0, t1: t1,
+                        width: w, tipWidth: depth <= 1 ? w * 0.68 : w, leaves: leaves })
             if (depth === maxDepth) {
                 // Most twigs stay leafy; only a few carry a flower.
                 if (r() < 0.1)
@@ -114,6 +127,18 @@ Canvas {
         builtHeight = height
         builtBase = base
         builtRootX = rootX
+    }
+
+    // A point along a stem, which is a gentle curve, t from 0 at its foot to 1.
+    function along(s, t) {
+        var u = 1 - t
+        return { x: u * u * s.x + 2 * u * t * s.cx + t * t * s.ex, y: u * u * s.y + 2 * u * t * s.cy + t * t * s.ey }
+    }
+    // Which way the stem is heading at t.
+    function headingAt(s, t) {
+        var dx = 2 * (1 - t) * (s.cx - s.x) + 2 * t * (s.ex - s.cx)
+        var dy = 2 * (1 - t) * (s.cy - s.y) + 2 * t * (s.ey - s.cy)
+        return Math.atan2(dy, dx)
     }
 
     function drawLeaf(ctx, x, y, angle, size, color) {
@@ -166,23 +191,31 @@ Canvas {
             var p = clamp((progress - s.t0) / (s.t1 - s.t0))
             if (p <= 0)
                 continue
-            ctx.beginPath()
-            ctx.moveTo(s.x, s.y)
-            ctx.lineTo(s.x + (s.ex - s.x) * p, s.y + (s.ey - s.y) * p)
-            ctx.lineWidth = s.width
+            // The stem as far as it has grown, in short pieces so a tapering one
+            // can thin as it goes; round ends hide the joins.
+            var pieces = s.tipWidth < s.width ? 6 : 3
             ctx.strokeStyle = stem
-            ctx.stroke()
+            for (var k = 0; k < pieces; k++) {
+                var ta = p * k / pieces, tb = p * (k + 1) / pieces
+                var a = along(s, ta), b = along(s, tb)
+                ctx.beginPath()
+                ctx.moveTo(a.x, a.y)
+                ctx.lineTo(b.x, b.y)
+                ctx.lineWidth = s.width + (s.tipWidth - s.width) * (ta + tb) / 2
+                ctx.stroke()
+            }
             if (season === "winter" && !wilted) {
                 // Frost rimes the upper edge of each branch.
-                ctx.beginPath()
-                ctx.moveTo(s.x, s.y - s.width * 0.25)
-                ctx.lineTo(s.x + (s.ex - s.x) * p, s.y + (s.ey - s.y) * p - s.width * 0.25)
-                ctx.lineWidth = Math.max(1, s.width * 0.3)
                 ctx.strokeStyle = lit("#e6f1f4")
+                ctx.lineWidth = Math.max(1, s.width * 0.3)
+                ctx.beginPath()
+                for (var fk = 0; fk <= pieces; fk++) {
+                    var fp = along(s, p * fk / pieces)
+                    fk === 0 ? ctx.moveTo(fp.x, fp.y - s.width * 0.25) : ctx.lineTo(fp.x, fp.y - s.width * 0.25)
+                }
                 ctx.stroke()
             }
 
-            var heading = Math.atan2(s.ey - s.y, s.ex - s.x)
             for (var j = 0; j < s.leaves.length; j++) {
                 var l = s.leaves[j]
                 // Winter strips most of the leaves.
@@ -191,10 +224,9 @@ Canvas {
                 var grown = clamp((p - l.f) * 4)
                 if (grown <= 0)
                     continue
-                var lx = s.x + (s.ex - s.x) * l.f
-                var ly = s.y + (s.ey - s.y) * l.f
+                var at = along(s, l.f)
                 var tilt = wilted ? 1.5 : 0.9
-                drawLeaf(ctx, lx, ly, heading + l.side * tilt, height * 0.035 * l.size * grown * leafScale, wilted ? wiltedLeaf : lit(leafColor(l.tone)))
+                drawLeaf(ctx, at.x, at.y, headingAt(s, l.f) + l.side * tilt, height * 0.035 * l.size * grown * leafScale, wilted ? wiltedLeaf : lit(leafColor(l.tone)))
             }
         }
 
