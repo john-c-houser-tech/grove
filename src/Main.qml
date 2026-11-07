@@ -18,6 +18,7 @@ ApplicationWindow {
     Material.roundedScale: theme.radius
 
     property bool helpVisible: false
+    property bool gardenVisible: false
     property bool quitConfirmed: false
     readonly property bool growing: backend.state === "growing"
     // Overcast, rain and fog dull the light on the plant and the ground.
@@ -67,14 +68,20 @@ ApplicationWindow {
         }
     }
 
-    Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: win.helpVisible = !win.helpVisible }
-    Shortcut { sequence: "Escape"; context: Qt.ApplicationShortcut; enabled: win.helpVisible && !confirm.opened; onActivated: win.helpVisible = false }
+    Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !confirm.opened && !win.gardenVisible; onActivated: win.helpVisible = !win.helpVisible }
+    Shortcut { sequence: "G"; context: Qt.ApplicationShortcut; enabled: !confirm.opened && !win.helpVisible; onActivated: win.gardenVisible = !win.gardenVisible }
+    Shortcut {
+        sequence: "Escape"
+        context: Qt.ApplicationShortcut
+        enabled: (win.helpVisible || win.gardenVisible) && !confirm.opened
+        onActivated: { win.helpVisible = false; win.gardenVisible = false }
+    }
     Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: horn.muted = !horn.muted }
     Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: win.quit() }
     Shortcut {
         sequence: "Space"
         context: Qt.ApplicationShortcut
-        enabled: !confirm.opened && !win.helpVisible
+        enabled: !confirm.opened && !win.helpVisible && !win.gardenVisible
         onActivated: {
             // Giving up wilts the plant, so it is the one action that asks.
             if (win.growing) win.ask("giveup")
@@ -172,9 +179,28 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             anchors.margins: 12
-            text: qsTr("? for keys")
+            text: qsTr("G garden · ? for keys")
             opacity: 0.35
             font.pixelSize: 12
+        }
+
+        // A garden that cannot be read or saved says so rather than hiding it.
+        Label {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.margins: 12
+            width: parent.width - 220
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            visible: garden.problem !== ""
+            text: garden.problem
+            color: "#ffb4a8"
+            font.pixelSize: 12
+        }
+
+        GardenView {
+            anchors.fill: parent
+            visible: win.gardenVisible
         }
 
         // Shortcut overlay.
@@ -201,6 +227,7 @@ ApplicationWindow {
                         model: [
                             { k: "Space", d: qsTr("Plant a seed, or give up") },
                             { k: "?", d: qsTr("Show or hide this help") },
+                            { k: "G", d: qsTr("Show or hide the garden") },
                             { k: "M", d: qsTr("Mute or unmute fog horns") },
                             { k: "Q", d: qsTr("Quit") }
                         ]
@@ -221,16 +248,18 @@ ApplicationWindow {
         anchors.centerIn: parent
         modal: true
         focus: true
-        title: action === "quit" ? qsTr("Quit and lose this plant?") : qsTr("Give up this session?")
+        title: action === "quit" ? qsTr("Quit and wilt this plant?") : qsTr("Give up this session?")
         standardButtons: Dialog.Yes | Dialog.No
         Label {
-            text: qsTr("The plant will wilt.")
+            text: qsTr("The plant will wilt, and the garden keeps it.")
             wrapMode: Text.WordWrap
         }
         // A Popup is not an Item, so Enter is a shortcut rather than a key handler.
         Shortcut { sequence: "Return"; enabled: confirm.opened; onActivated: confirm.accept() }
         onAccepted: {
             if (action === "quit") {
+                // Leaving mid-session wilts the plant, and the garden keeps it.
+                backend.giveUp()
                 win.quitConfirmed = true
                 Qt.quit()
             } else {

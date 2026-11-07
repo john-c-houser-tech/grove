@@ -9,6 +9,7 @@ HEADERS += \
     src/light.h \
     src/weather.h \
     src/foghorn.h \
+    src/garden.h \
     src/theme.h \
     src/translator.h
 
@@ -18,6 +19,7 @@ SOURCES += \
     src/light.cpp \
     src/weather.cpp \
     src/foghorn.cpp \
+    src/garden.cpp \
     src/theme.cpp \
     src/translator.cpp
 

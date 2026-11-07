@@ -17,9 +17,16 @@ frosted in winter. In fog, a deep horn sounds now and then, with a quieter
 answer from farther out; it is synthesized at start-up, never fetched.
 `GROVE_WEATHER=fog` and `GROVE_DATE=2026-10-20` pin the weather and the date.
 
+Every finished or wilted plant is kept in `~/.local/share/grove/garden.json`
+(written atomically; a file that cannot be read is left untouched and the
+window says so). Quitting mid-session wilts the plant. Press G to see them all.
+`GROVE_GARDEN=/path/garden.json` uses another file, and a session shortened
+with `GROVE_SECONDS` is not saved unless you set it.
+
 | Key   | Action                   |
 |-------|--------------------------|
 | Space | Plant a seed, or give up |
 | ?     | Show the keys            |
+| G     | Show or hide the garden  |
 | M     | Mute or unmute fog horns |
 | Q     | Quit                     |

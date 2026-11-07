@@ -5,6 +5,7 @@
 
 #include "backend.h"
 #include "foghorn.h"
+#include "garden.h"
 #include "light.h"
 #include "theme.h"
 #include "translator.h"
@@ -256,6 +257,70 @@ private slots:
         QVERIFY(horn.muted());
     }
 
+    void emptyGardenStartsEmpty()
+    {
+        QTemporaryDir dir;
+        Garden garden(dir.filePath("garden.json"));
+        QCOMPARE(garden.rowCount(), 0);
+        QCOMPARE(garden.grown(), 0);
+        QVERIFY(garden.problem().isEmpty());
+        // Nothing is written until there is something to keep.
+        QVERIFY(!QFile::exists(dir.filePath("garden.json")));
+    }
+
+    void recordedPlantsSurviveARestartNewestFirst()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("nested/garden.json");
+        {
+            Garden garden(path);
+            garden.record(plant(11, "done", 1.0, 25));
+            garden.record(plant(22, "wilted", 0.4, 0));
+            garden.record(plant(33, "done", 1.0, 25));
+            QCOMPARE(garden.grown(), 2);
+            QCOMPARE(garden.wilted(), 1);
+            QCOMPARE(garden.focusedMinutes(), 50);
+            QCOMPARE(garden.data(garden.index(0), Garden::SeedRole).toInt(), 33);
+        }
+        Garden again(path);
+        QCOMPARE(again.rowCount(), 3);
+        QCOMPARE(again.data(again.index(0), Garden::SeedRole).toInt(), 33);
+        QCOMPARE(again.data(again.index(1), Garden::OutcomeRole).toString(), QString("wilted"));
+        QCOMPARE(again.data(again.index(1), Garden::ProgressRole).toDouble(), 0.4);
+        QCOMPARE(again.data(again.index(2), Garden::SeedRole).toInt(), 11);
+        QCOMPARE(again.focusedMinutes(), 50);
+        QVERIFY(again.problem().isEmpty());
+    }
+
+    void unreadableGardenIsLeftUntouched()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("garden.json");
+        write(path, "this is not json");
+        Garden garden(path);
+        QVERIFY(!garden.problem().isEmpty());
+        garden.record(plant(5, "done", 1.0, 25));
+        // The new plant shows in the window but must not replace the old file.
+        QCOMPARE(garden.rowCount(), 1);
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("this is not json"));
+    }
+
+    void gardenWithABadEntryIsNotOverwritten()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("garden.json");
+        const QByteArray bad = R"({"version":1,"plants":[{"seed":1,"outcome":"sprouted"}]})";
+        write(path, bad);
+        Garden garden(path);
+        QVERIFY(!garden.problem().isEmpty());
+        garden.record(plant(5, "done", 1.0, 25));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), bad);
+    }
+
     void themeFallsBack()
     {
         QTemporaryDir dir;
@@ -300,6 +365,19 @@ private slots:
     }
 
 private:
+    static Garden::Plant plant(int seed, const QString &outcome, double progress, int minutes)
+    {
+        Garden::Plant p;
+        p.seed = seed;
+        p.outcome = outcome;
+        p.season = "autumn";
+        p.weather = "fog";
+        p.progress = progress;
+        p.when = QDateTime(QDate(2026, 11, 6), QTime(9, 30));
+        p.minutes = minutes;
+        return p;
+    }
+
     static void write(const QString &path, const QByteArray &contents)
     {
         QFile file(path);

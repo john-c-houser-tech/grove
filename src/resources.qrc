@@ -4,6 +4,7 @@
         <file alias="GrowingPlant.qml">GrowingPlant.qml</file>
         <file alias="SkyBackdrop.qml">SkyBackdrop.qml</file>
         <file alias="Clouds.qml">Clouds.qml</file>
+        <file alias="GardenView.qml">GardenView.qml</file>
         <file alias="Precipitation.qml">Precipitation.qml</file>
         <file alias="i18n/en.json">i18n/en.json</file>
     </qresource>

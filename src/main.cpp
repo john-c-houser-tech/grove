@@ -12,6 +12,7 @@
 
 #include "backend.h"
 #include "foghorn.h"
+#include "garden.h"
 #include "light.h"
 #include "theme.h"
 #include "translator.h"
@@ -54,12 +55,30 @@ int main(int argc, char *argv[]) {
     Weather weather(qEnvironmentVariable("GROVE_WEATHER"));
     weather.begin(1 + QRandomGenerator::global()->bounded(1 << 30), today);
     FogHorn horn;
+
+    // GROVE_GARDEN points the garden at another file. A shortened test session
+    // (GROVE_SECONDS) is not saved unless it does, so trying the app out never
+    // adds make-believe plants to the real garden.
+    const bool shortened = qEnvironmentVariableIsSet("GROVE_SECONDS");
+    Garden garden(qEnvironmentVariable("GROVE_GARDEN"));
+    const bool saving = !shortened || qEnvironmentVariableIsSet("GROVE_GARDEN");
     // A new session rolls new weather; the plant's progress carries it along.
     auto updateHorn = [&] { horn.setActive(backend.state() == "growing" && weather.fog() > 0.5); };
     QObject::connect(&backend, &Backend::stateChanged, &weather, [&] {
         if (backend.state() == "growing")
             weather.begin(backend.seed(), today);
         updateHorn();
+        if (saving && (backend.state() == "done" || backend.state() == "wilted")) {
+            Garden::Plant plant;
+            plant.seed = backend.seed();
+            plant.outcome = backend.state();
+            plant.season = weather.season();
+            plant.weather = weather.kind();
+            plant.progress = weather.growth();
+            plant.when = QDateTime::currentDateTime();
+            plant.minutes = backend.state() == "done" ? backend.minutes() : 0;
+            garden.record(plant);
+        }
     });
     QObject::connect(&backend, &Backend::progressChanged, &weather, [&] { weather.setProgress(backend.progress()); });
     QObject::connect(&weather, &Weather::changed, &horn, updateHorn);
@@ -72,6 +91,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("light", &light);
     engine.rootContext()->setContextProperty("weather", &weather);
     engine.rootContext()->setContextProperty("horn", &horn);
+    engine.rootContext()->setContextProperty("garden", &garden);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;

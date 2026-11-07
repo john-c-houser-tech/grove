@@ -69,6 +69,9 @@ Canvas {
         var segs = [], ends = []
         var maxDepth = 6
         var unit = height
+        // Stroke widths were drawn for a plant about 670 pixels tall; a tile in
+        // the garden is much smaller and its branches must thin with it.
+        var scale = Math.max(0.15, height / 670)
 
         function grow(x, y, angle, length, depth, t0) {
             var t1 = depth === 0 ? 0.22 : t0 + 0.13
@@ -81,7 +84,7 @@ Canvas {
                     leaves.push({ f: 0.35 + r() * 0.6, side: r() < 0.5 ? -1 : 1, size: 0.75 + r() * 0.5, tone: r() })
             }
             segs.push({ x: x, y: y, ex: ex, ey: ey, t0: t0, t1: t1,
-                        width: Math.max(1.4, 9 * Math.pow(0.62, depth)), leaves: leaves })
+                        width: Math.max(1.4 * scale, 9 * scale * Math.pow(0.62, depth)), leaves: leaves })
             if (depth === maxDepth) {
                 // Most twigs stay leafy; only a few carry a flower.
                 if (r() < 0.1)
