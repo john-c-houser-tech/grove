@@ -35,7 +35,7 @@ void PaintedLayer::render() {
         m_again = true;
         return;
     }
-    if (!window() || width() <= 0 || height() <= 0)
+    if (window() == nullptr || width() <= 0 || height() <= 0)
         return;
     const Painting painting = this->painting();
     const QSizeF size = this->size();
@@ -62,8 +62,8 @@ PaintedLayer::Picture PaintedLayer::draw(const Painting &painting, const QSizeF 
 
     // Keep only the rows with something in them.
     const auto empty = [&image](int y) {
-        const auto *row = reinterpret_cast<const quint32 *>(image.constScanLine(y));
-        return std::all_of(row, row + image.width(), [](quint32 pixel) { return pixel == 0; });
+        const uchar *row = image.constScanLine(y);
+        return std::all_of(row, row + static_cast<ptrdiff_t>(image.width()) * 4, [](uchar byte) { return byte == 0; });
     };
     int top = 0, end = image.height();
     while (top < end && empty(top))
@@ -78,8 +78,8 @@ PaintedLayer::Picture PaintedLayer::draw(const Painting &painting, const QSizeF 
     return picture;
 }
 
-QSGNode *PaintedLayer::updatePaintNode(QSGNode *old, UpdatePaintNodeData *) {
-    auto *node = static_cast<QSGSimpleTextureNode *>(old);
+QSGNode *PaintedLayer::updatePaintNode(QSGNode *old, UpdatePaintNodeData * /*data*/) {
+    auto *node = dynamic_cast<QSGSimpleTextureNode *>(old);
     if (!m_hasReady)
         return node;
     m_hasReady = false;
@@ -88,7 +88,7 @@ QSGNode *PaintedLayer::updatePaintNode(QSGNode *old, UpdatePaintNodeData *) {
         delete node;
         return nullptr;
     }
-    if (!node) {
+    if (node == nullptr) {
         node = new QSGSimpleTextureNode;
         node->setOwnsTexture(true);
         node->setFiltering(QSGTexture::Linear);

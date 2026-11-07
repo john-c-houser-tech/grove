@@ -6,20 +6,19 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QVariantMap>
+#include <utility>
 
-Notifier::Notifier(const QString &service, QObject *parent) : QObject(parent), m_service(service) {}
+Notifier::Notifier(QString service, QObject *parent) : QObject(parent), m_service(std::move(service)) {}
 
 void Notifier::setProblem(Problem::Words words) {
     if (m_problem.set(std::move(words)))
         emit problemChanged();
 }
 
-void Notifier::plantGrown() {
-    send(tr("Your plant is fully grown"), tr("Take a breath, then plant another."));
-}
+void Notifier::plantGrown() { send(tr("Your plant is fully grown"), tr("Take a breath, then plant another.")); }
 
 void Notifier::send(const QString &summary, const QString &body) {
-    QDBusConnection bus = QDBusConnection::sessionBus();
+    const QDBusConnection bus = QDBusConnection::sessionBus();
     if (!bus.isConnected()) {
         setProblem([] { return tr("No desktop session bus, so Grove cannot send notifications."); });
         return;
@@ -31,11 +30,13 @@ void Notifier::send(const QString &summary, const QString &body) {
             << QVariantMap{{"desktop-entry", "grove"}} << -1;
 
     // Asynchronous, so a slow or missing service never freezes the window.
-    auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
+    const auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
         const QDBusPendingReply<unsigned> reply = *call;
         if (reply.isError()) {
-            setProblem([] { return tr("No notification service is running, so Grove cannot tell you when a plant is done."); });
+            setProblem([] {
+                return tr("No notification service is running, so Grove cannot tell you when a plant is done.");
+            });
         } else {
             m_lastId = reply.value();
             setProblem({});

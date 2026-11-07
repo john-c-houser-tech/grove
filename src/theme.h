@@ -8,6 +8,7 @@
 
 class Theme : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(Theme)
     Q_PROPERTY(QString accent READ accent NOTIFY changed)
     Q_PROPERTY(QString accentForeground READ accentForeground NOTIFY changed)
     Q_PROPERTY(int radius READ radius NOTIFY changed)

@@ -8,11 +8,13 @@
 #include <QJsonObject>
 #include <QLocale>
 #include <QRegularExpression>
+#include <algorithm>
+#include <utility>
 
-Translator::Translator(const QString &languageFile, const QString &catalogDirectory, QObject *parent)
+Translator::Translator(const QString &languageFile, QString catalogDirectory, QObject *parent)
     : QTranslator(parent),
       m_languageFile(languageFile.isEmpty() ? QDir::homePath() + "/.config/omarchy/language" : languageFile),
-      m_catalogDirectory(catalogDirectory) {
+      m_catalogDirectory(std::move(catalogDirectory)) {
     m_debounce.setSingleShot(true);
     m_debounce.setInterval(80);
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] { m_debounce.start(); });
@@ -37,10 +39,12 @@ QString Translator::pluralCategory(const QString &language, long long count) {
     const long long n = count < 0 ? -count : count, n10 = n % 10, n100 = n % 100;
     const bool millions = n != 0 && n % 1000000 == 0;
     const bool teens = n100 >= 12 && n100 <= 14;
-    const QString code = language;
-    auto in = [&](std::initializer_list<const char *> codes) {
-        for (const char *c : codes) if (code == QLatin1String(c)) return true;
-        return false;
+    const QString &code = language;
+    // One language's rule a line, as CLDR lists them, so they can be checked
+    // against it; formatting would scatter them.
+    // clang-format off
+    const auto in = [&](std::initializer_list<const char *> codes) {
+        return std::any_of(codes.begin(), codes.end(), [&](const char *c) { return code == QLatin1String(c); });
     };
     if (in({"ja", "ko", "zh-CN", "zh-TW", "th", "vi", "id", "ms"})) return "other";
     if (in({"hi", "bn", "fa", "si"})) return n <= 1 ? "one" : "other";
@@ -63,6 +67,7 @@ QString Translator::pluralCategory(const QString &language, long long count) {
     if (code == "he") return n == 1 ? "one" : n == 2 ? "two" : "other";
     if (code == "ga") return n == 1 ? "one" : n == 2 ? "two" : n >= 3 && n <= 6 ? "few" : n >= 7 && n <= 10 ? "many" : "other";
     return n == 1 ? "one" : "other";
+    // clang-format on
 }
 
 // The locale Omarchy formats this language with, from its registry, so the
@@ -71,15 +76,20 @@ QString Translator::pluralCategory(const QString &language, long long count) {
 QLocale Translator::formatLocale(const QString &language) {
     QFile registry(qEnvironmentVariable("OMARCHY_PATH") + "/default/i18n/locales.json");
     if (registry.open(QIODevice::ReadOnly)) {
-        const QString name = QJsonDocument::fromJson(registry.readAll()).object()
-                                 .value(language).toObject().value("formatLocale").toString();
+        const QString name = QJsonDocument::fromJson(registry.readAll())
+                                 .object()
+                                 .value(language)
+                                 .toObject()
+                                 .value("formatLocale")
+                                 .toString();
         if (!name.isEmpty())
             return QLocale(name);
     }
     return QLocale(language);
 }
 
-QString Translator::translate(const char *, const char *sourceText, const char *, int n) const {
+QString Translator::translate(const char * /*context*/, const char *sourceText, const char * /*disambiguation*/,
+                              int n) const {
     // A null string tells Qt there is no translation, so it shows the English.
     const QJsonValue value = m_strings.value(QString::fromUtf8(sourceText));
     if (value.isString())
@@ -127,7 +137,7 @@ void Translator::reload() {
     }
 
     m_language = language;
-    m_strings = strings;
+    m_strings = std::move(strings);
     // Dates, numbers, and Qt's own day and month names follow the language
     // too, and right-to-left languages mirror the window.
     const QLocale locale = formatLocale(language);

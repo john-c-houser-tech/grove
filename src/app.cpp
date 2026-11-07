@@ -67,7 +67,7 @@ App::App(const Options &options)
     m_light.setAccent(QColor(m_theme.accent()));
     QObject::connect(&m_theme, &Theme::changed, &m_light, [this] { m_light.setAccent(QColor(m_theme.accent())); });
 
-    m_weather.begin(1 + QRandomGenerator::global()->bounded(1 << 30), today());
+    m_weather.begin(QRandomGenerator::global()->bounded(1, Backend::kSeedLimit), today());
     m_sounds.setPeriodSource([this]() -> QString {
         if (m_light.sunUp() && m_light.ambient() > 0.6)
             return "day";

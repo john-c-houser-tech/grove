@@ -52,6 +52,8 @@ public:
     ~App();
     App(const App &) = delete;
     App &operator=(const App &) = delete;
+    App(App &&) = delete;
+    App &operator=(App &&) = delete;
 
     // Loads the window. False if it could not be made.
     bool load();

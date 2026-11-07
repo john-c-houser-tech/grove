@@ -24,8 +24,9 @@ Theme::Theme(const QString &directory, QObject *parent, const QString &hyprctl)
     // overrides can both set, so ask hyprctl rather than reading its config.
     // Without Hyprland the corners stay sharp, like Omarchy's default.
     m_hyprctl = !hyprctl.isEmpty() ? hyprctl
-              : directory.isEmpty() && !qEnvironmentVariableIsEmpty("HYPRLAND_INSTANCE_SIGNATURE")
-                  ? QStandardPaths::findExecutable("hyprctl") : QString();
+                : directory.isEmpty() && !qEnvironmentVariableIsEmpty("HYPRLAND_INSTANCE_SIGNATURE")
+                    ? QStandardPaths::findExecutable("hyprctl")
+                    : QString();
     m_roundingTimeout.setSingleShot(true);
     m_roundingTimeout.setInterval(500);
     connect(&m_roundingTimeout, &QTimer::timeout, &m_roundingProcess, &QProcess::kill);
@@ -55,8 +56,8 @@ Theme::Theme(const QString &directory, QObject *parent, const QString &hyprctl)
             if (reloaded)
                 refreshRounding();
         });
-        m_events.connectToServer(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/hypr/" +
-                                     qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE") + "/.socket2.sock",
+        m_events.connectToServer(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/hypr/"
+                                     + qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE") + "/.socket2.sock",
                                  QIODevice::ReadOnly);
     }
     reload();
@@ -104,7 +105,7 @@ QString Theme::readAccent(const QString &path) {
 // Black or white, whichever reads on the accent (WCAG relative luminance).
 QString Theme::accentForeground() const {
     const QColor c(m_accent);
-    auto linear = [](double v) { return v <= .04045 ? v / 12.92 : std::pow((v + .055) / 1.055, 2.4); };
+    const auto linear = [](double v) { return v <= .04045 ? v / 12.92 : std::pow((v + .055) / 1.055, 2.4); };
     const double luminance = .2126 * linear(c.redF()) + .7152 * linear(c.greenF()) + .0722 * linear(c.blueF());
     return luminance > .179 ? "black" : "white";
 }
@@ -121,8 +122,8 @@ void Theme::reload() {
     QString ancestor = m_directory;
     while (!QFileInfo::exists(ancestor) && ancestor != "/")
         ancestor = QFileInfo(ancestor).absolutePath();
-    QStringList candidates{ancestor, QFileInfo(ancestor).absolutePath(), m_directory,
-                           m_directory + "/theme", m_directory + "/theme/colors.toml"};
+    QStringList candidates{ancestor, QFileInfo(ancestor).absolutePath(), m_directory, m_directory + "/theme",
+                           m_directory + "/theme/colors.toml"};
     candidates.removeDuplicates();
     for (const auto &path : candidates)
         if (QFileInfo::exists(path))

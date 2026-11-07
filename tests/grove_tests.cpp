@@ -1,6 +1,6 @@
 #include <QDir>
-#include <QPainter>
 #include <QFile>
+#include <QPainter>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -21,15 +21,13 @@ class GroveTests : public QObject {
     Q_OBJECT
 
 private slots:
-    void startsIdle()
-    {
+    void startsIdle() {
         Backend backend(10);
         QCOMPARE(backend.state(), QString("idle"));
         QCOMPARE(backend.progress(), 0.0);
     }
 
-    void growsWithTime()
-    {
+    void growsWithTime() {
         Backend backend(10);
         backend.start();
         QCOMPARE(backend.state(), QString("growing"));
@@ -38,8 +36,7 @@ private slots:
         QCOMPARE(backend.remaining(), 8);
     }
 
-    void finishesWhenTheTimeIsUp()
-    {
+    void finishesWhenTheTimeIsUp() {
         Backend backend(10);
         backend.start();
         backend.advance(10000);
@@ -48,8 +45,7 @@ private slots:
         QCOMPARE(backend.remaining(), 0);
     }
 
-    void givingUpWiltsThePlant()
-    {
+    void givingUpWiltsThePlant() {
         Backend backend(10);
         backend.start();
         backend.advance(4000);
@@ -60,15 +56,13 @@ private slots:
         QCOMPARE(backend.progress(), 0.4);
     }
 
-    void giveUpDoesNothingWhenIdle()
-    {
+    void giveUpDoesNothingWhenIdle() {
         Backend backend(10);
         backend.giveUp();
         QCOMPARE(backend.state(), QString("idle"));
     }
 
-    void startingAgainResets()
-    {
+    void startingAgainResets() {
         Backend backend(10);
         backend.start();
         backend.advance(5000);
@@ -78,8 +72,7 @@ private slots:
         QCOMPARE(backend.progress(), 0.0);
     }
 
-    void startingWhileGrowingKeepsTheSession()
-    {
+    void startingWhileGrowingKeepsTheSession() {
         Backend backend(10);
         backend.start();
         backend.advance(5000);
@@ -87,8 +80,7 @@ private slots:
         QCOMPARE(backend.progress(), 0.5);
     }
 
-    void fullSessionsAnnounceProgressOnceASecond()
-    {
+    void fullSessionsAnnounceProgressOnceASecond() {
         Backend backend(25 * 60);
         backend.start();
         QSignalSpy spy(&backend, &Backend::progressChanged);
@@ -99,8 +91,7 @@ private slots:
         QCOMPARE(backend.remaining(), 25 * 60 - 1);
     }
 
-    void shortSessionsStillGrowSmoothly()
-    {
+    void shortSessionsStillGrowSmoothly() {
         Backend backend(10);
         backend.start();
         QSignalSpy spy(&backend, &Backend::progressChanged);
@@ -109,8 +100,7 @@ private slots:
         QCOMPARE(spy.count(), 20);
     }
 
-    void theEndOfASessionIsAlwaysAnnounced()
-    {
+    void theEndOfASessionIsAlwaysAnnounced() {
         Backend backend(25 * 60);
         backend.start();
         backend.advance(25 * 60 * 1000 - 10);
@@ -120,16 +110,14 @@ private slots:
         QCOMPARE(backend.progress(), 1.0);
     }
 
-    void aLayerKeepsOnlyTheRowsWithSomethingInThem()
-    {
+    void aLayerKeepsOnlyTheRowsWithSomethingInThem() {
         const auto band = [](QPainter &p, double width, double) { p.fillRect(QRectF(0, 30, width, 20), Qt::red); };
         const PaintedLayer::Picture picture = PaintedLayer::draw(band, QSizeF(100, 100), -1, 1);
         QCOMPARE(picture.top, 30.0);
         QCOMPARE(picture.image.size(), QSize(100, 20));
     }
 
-    void aLayerIsDrawnAtTheDisplaysScale()
-    {
+    void aLayerIsDrawnAtTheDisplaysScale() {
         const auto band = [](QPainter &p, double width, double) { p.fillRect(QRectF(0, 30, width, 20), Qt::red); };
         const PaintedLayer::Picture picture = PaintedLayer::draw(band, QSizeF(100, 100), -1, 2);
         QCOMPARE(picture.top, 30.0);
@@ -137,17 +125,17 @@ private slots:
         QCOMPARE(picture.image.devicePixelRatio(), 2.0);
     }
 
-    void nothingIsDrawnWhereTheGroundCoversIt()
-    {
-        const auto all = [](QPainter &p, double width, double height) { p.fillRect(QRectF(0, 0, width, height), Qt::red); };
+    void nothingIsDrawnWhereTheGroundCoversIt() {
+        const auto all = [](QPainter &p, double width, double height) {
+            p.fillRect(QRectF(0, 0, width, height), Qt::red);
+        };
         QCOMPARE(PaintedLayer::draw(all, QSizeF(100, 100), 60, 1).image.size(), QSize(100, 60));
         // Nothing drawn, nothing kept.
         const auto none = [](QPainter &, double, double) {};
         QVERIFY(PaintedLayer::draw(none, QSizeF(100, 100), -1, 1).image.isNull());
     }
 
-    void theFieldIsSeenFromStandingHeight()
-    {
+    void theFieldIsSeenFromStandingHeight() {
         Field field;
         field.setSize(QSizeF(800, 1000));
         // The far edge is 40 m off and the plant 4 m, seen from 1.6 m up.
@@ -155,13 +143,13 @@ private slots:
         QCOMPARE(field.plantBaseY(), 600 + 1000 * 0.21 * 4 * 1.6 / 4);
     }
 
-    void eachPartOfTheLandscapeKeepsToItsOwnBand()
-    {
+    void eachPartOfTheLandscapeKeepsToItsOwnBand() {
         const QSizeF size(400, 500);
         const double ground = 500 * 0.6 + 500 * 0.21 * 4 * 1.6 / 40;
         const auto field = [&](const QString &part) {
             const Field::Look look{0.6, ground, 0.5, 0.33, part, QColor("#2a2018"), QColor("#9fb7c4"), 0, false};
-            return PaintedLayer::draw([look](QPainter &p, double w, double h) { Field::paint(p, look, w, h); }, size, -1, 1);
+            return PaintedLayer::draw([look](QPainter &p, double w, double h) { Field::paint(p, look, w, h); }, size,
+                                      -1, 1);
         };
         // The far field starts at its far edge and runs to the bottom.
         const PaintedLayer::Picture far = field("far");
@@ -174,9 +162,21 @@ private slots:
         // The hills stop where the ground covers them, and the near hills
         // are lower than the far range.
         const auto hills = [&](const QString &part) {
-            const Hills::Look look{0.6, part, 0.6, QColor("#6b7f9c"), QColor("#46605a"), QColor("#30493b"),
-                                   QColor("#9fb7c4"), QColor("#4d5a6c"), QColor("#2f3e35"), 1, 0.5, 0.3, QColor("#f2f6fa")};
-            return PaintedLayer::draw([look](QPainter &p, double w, double h) { Hills::paint(p, look, w, h); }, size, ground, 1);
+            const Hills::Look look{0.6,
+                                   part,
+                                   0.6,
+                                   QColor("#6b7f9c"),
+                                   QColor("#46605a"),
+                                   QColor("#30493b"),
+                                   QColor("#9fb7c4"),
+                                   QColor("#4d5a6c"),
+                                   QColor("#2f3e35"),
+                                   1,
+                                   0.5,
+                                   0.3,
+                                   QColor("#f2f6fa")};
+            return PaintedLayer::draw([look](QPainter &p, double w, double h) { Hills::paint(p, look, w, h); }, size,
+                                      ground, 1);
         };
         const PaintedLayer::Picture back = hills("back"), front = hills("front");
         QCOMPARE(back.top + back.image.height(), std::ceil(ground));
@@ -184,8 +184,7 @@ private slots:
         QVERIFY(front.top > back.top + 500 * 0.15);
     }
 
-    void sunriseIsEarlierInSummer()
-    {
+    void sunriseIsEarlierInSummer() {
         double summerRise = 0, summerSet = 0, winterRise = 0, winterSet = 0;
         Light::sunTimes(QDate(2026, 6, 21), summerRise, summerSet);
         Light::sunTimes(QDate(2026, 12, 21), winterRise, winterSet);
@@ -195,8 +194,7 @@ private slots:
         QVERIFY(winterSet - winterRise < 9);
     }
 
-    void noonIsBrightAndMidnightIsDark()
-    {
+    void noonIsBrightAndMidnightIsDark() {
         const QColor accent("#FFD60A");
         const Sky noon = Light::sky(QDateTime(QDate(2026, 6, 21), QTime(12, 30)), accent);
         const Sky midnight = Light::sky(QDateTime(QDate(2026, 6, 21), QTime(0, 30)), accent);
@@ -209,8 +207,7 @@ private slots:
         QVERIFY(noon.top.lightnessF() > midnight.top.lightnessF());
     }
 
-    void lightTurnsGoldenAtSunset()
-    {
+    void lightTurnsGoldenAtSunset() {
         double rise = 0, set = 0;
         Light::sunTimes(QDate(2026, 11, 6), rise, set);
         const QColor accent("#FFD60A");
@@ -222,15 +219,13 @@ private slots:
         QVERIFY(at(1.0).warmth < 0.05);
     }
 
-    void moonSharesTheNightSky()
-    {
+    void moonSharesTheNightSky() {
         const Sky midnight = Light::sky(QDateTime(QDate(2026, 11, 6), QTime(0, 0)), QColor("#FFD60A"));
         QVERIFY(midnight.moonElevation > 0.5);
         QVERIFY(midnight.moonX > 0 && midnight.moonX < 1);
     }
 
-    void fixedTimeFreezesTheLight()
-    {
+    void fixedTimeFreezesTheLight() {
         Light light(QDateTime(QDate(2026, 6, 21), QTime(12, 30)));
         QVERIFY(light.sunUp());
         const QColor before = light.skyTop();
@@ -238,16 +233,14 @@ private slots:
         QCOMPARE(light.skyTop(), before);
     }
 
-    void seasonsFollowTheCalendar()
-    {
+    void seasonsFollowTheCalendar() {
         QCOMPARE(Weather::seasonOf(QDate(2026, 4, 1)), QString("spring"));
         QCOMPARE(Weather::seasonOf(QDate(2026, 7, 1)), QString("summer"));
         QCOMPARE(Weather::seasonOf(QDate(2026, 11, 6)), QString("autumn"));
         QCOMPARE(Weather::seasonOf(QDate(2026, 1, 15)), QString("winter"));
     }
 
-    void pinnedWeatherNeverChanges()
-    {
+    void pinnedWeatherNeverChanges() {
         Weather weather("fog");
         weather.begin(5, QDate(2026, 11, 6));
         QCOMPARE(weather.kind(), QString("fog"));
@@ -258,8 +251,7 @@ private slots:
         QVERIFY(weather.fog() > 0.8);
     }
 
-    void sameSeedGivesTheSameWeather()
-    {
+    void sameSeedGivesTheSameWeather() {
         Weather a, b;
         a.begin(1234, QDate(2026, 11, 6));
         b.begin(1234, QDate(2026, 11, 6));
@@ -271,8 +263,7 @@ private slots:
         }
     }
 
-    void weatherCanChangeDuringASession()
-    {
+    void weatherCanChangeDuringASession() {
         // Some seed in a hundred must start and end differently.
         bool changed = false;
         for (int seed = 1; seed < 100 && !changed; ++seed) {
@@ -286,8 +277,7 @@ private slots:
         QVERIFY(changed);
     }
 
-    void autumnIsFoggierThanSummer()
-    {
+    void autumnIsFoggierThanSummer() {
         auto share = [](const QString &season) {
             QRandomGenerator random(99);
             int fog = 0;
@@ -298,8 +288,7 @@ private slots:
         QVERIFY(share("autumn") > share("summer") * 2);
     }
 
-    void rainSpeedsGrowthButFinishesOnTime()
-    {
+    void rainSpeedsGrowthButFinishesOnTime() {
         Weather weather("rain");
         weather.begin(1, QDate(2026, 11, 6));
         QCOMPARE(weather.growth(), 0.0);
@@ -315,8 +304,7 @@ private slots:
         QVERIFY(qAbs(dry.growth() - 0.5) < 0.01);
     }
 
-    void growthNeverGoesBackwards()
-    {
+    void growthNeverGoesBackwards() {
         Weather weather("rain");
         weather.begin(1, QDate(2026, 11, 6));
         double last = 0;
@@ -327,8 +315,7 @@ private slots:
         }
     }
 
-    void growingDoesNotRedrawSteadyWeather()
-    {
+    void growingDoesNotRedrawSteadyWeather() {
         Weather weather("rain");
         weather.begin(1, QDate(2026, 11, 6));
         QSignalSpy sky(&weather, &Weather::changed);
@@ -339,8 +326,7 @@ private slots:
         QCOMPARE(growth.count(), 100);
     }
 
-    void changingWeatherIsAnnouncedInVisibleStepsAndSettlesExactly()
-    {
+    void changingWeatherIsAnnouncedInVisibleStepsAndSettlesExactly() {
         for (int seed = 1; seed < 100; ++seed) {
             Weather weather, jumped;
             weather.begin(seed, QDate(2026, 11, 6));
@@ -364,8 +350,7 @@ private slots:
         QFAIL("no seed changed the weather");
     }
 
-    void trainFillsItsLengthAndFadesInAndOut()
-    {
+    void trainFillsItsLengthAndFadesInAndOut() {
         const QByteArray pcm = Sounds::synthesizeTrain(44100);
         QCOMPARE(pcm.size(), Sounds::trainMilliseconds() / 1000 * 44100 * 2);
         QVERIFY(peakOf(pcm, 0, 44100 * 44) > 15000);
@@ -374,8 +359,7 @@ private slots:
         QVERIFY(peakOf(pcm, pcm.size() / 2 - 200, pcm.size() / 2) < 300);
     }
 
-    void trainHornsAreLoudestAsItArrives()
-    {
+    void trainHornsAreLoudestAsItArrives() {
         const QByteArray pcm = Sounds::synthesizeTrain(44100);
         // The first signal is far off, the second close, and the rails alone are quiet.
         const double rails = rmsOf(pcm, 0.5, 2.5), far = rmsOf(pcm, 3.2, 5.2), close = rmsOf(pcm, 16.2, 18.2);
@@ -385,8 +369,7 @@ private slots:
         QVERIFY(rmsOf(pcm, 40, 42) < close * 0.3);
     }
 
-    void planeIsMuchFainterThanTheTrain()
-    {
+    void planeIsMuchFainterThanTheTrain() {
         const QByteArray plane = Sounds::synthesizePlane(44100);
         const QByteArray train = Sounds::synthesizeTrain(44100);
         QCOMPARE(plane.size(), Sounds::planeMilliseconds() / 1000 * 44100 * 2);
@@ -394,16 +377,14 @@ private slots:
         QVERIFY(peakOf(plane, 0, plane.size() / 2) < peakOf(train, 0, train.size() / 2) / 2);
     }
 
-    void planePassesOverheadInTheMiddle()
-    {
+    void planePassesOverheadInTheMiddle() {
         const QByteArray pcm = Sounds::synthesizePlane(44100);
         const double middle = rmsOf(pcm, 13, 17), early = rmsOf(pcm, 2, 5), late = rmsOf(pcm, 25, 28);
         QVERIFY(middle > early * 3);
         QVERIFY(middle > late * 3);
     }
 
-    void trainsHappenOneToThreeTimesAndPlanesZeroToTwo()
-    {
+    void trainsHappenOneToThreeTimesAndPlanesZeroToTwo() {
         QRandomGenerator random(8);
         QSet<int> trains, planes;
         for (int i = 0; i < 500; ++i) {
@@ -417,8 +398,7 @@ private slots:
         QCOMPARE(planes.size(), 3);
     }
 
-    void eventsAreSpreadWithinTheSession()
-    {
+    void eventsAreSpreadWithinTheSession() {
         QRandomGenerator random(4);
         for (int i = 0; i < 200; ++i) {
             const QList<double> times = Sounds::eventTimes(random, 3, 1500, 44);
@@ -432,8 +412,7 @@ private slots:
         }
     }
 
-    void tooShortASessionGetsNoSounds()
-    {
+    void tooShortASessionGetsNoSounds() {
         QRandomGenerator random(1);
         QVERIFY(Sounds::eventTimes(random, 2, 30, 44).isEmpty());
         // Room for one but not three: fewer come back rather than crowding.
@@ -441,16 +420,14 @@ private slots:
         QVERIFY(some.size() >= 1 && some.size() < 3);
     }
 
-    void soundsMuteIsRemembered()
-    {
+    void soundsMuteIsRemembered() {
         Sounds sounds(false);
         QVERIFY(!sounds.muted());
         sounds.setMuted(true);
         QVERIFY(sounds.muted());
     }
 
-    void aPlaneFlyoverShowsEvenWhenMuted()
-    {
+    void aPlaneFlyoverShowsEvenWhenMuted() {
         Sounds sounds(false, "plane");
         sounds.setMuted(true);
         QSignalSpy spy(&sounds, &Sounds::planeFlyover);
@@ -461,8 +438,7 @@ private slots:
         QVERIFY(direction == 1 || direction == -1);
     }
 
-    void endingASessionFadesOutWhatIsPassing()
-    {
+    void endingASessionFadesOutWhatIsPassing() {
         Sounds sounds(false, "train");
         QSignalSpy fading(&sounds, &Sounds::fadingOut);
         QSignalSpy trains(&sounds, &Sounds::trainPassing);
@@ -474,8 +450,7 @@ private slots:
         QCOMPARE(trains.count(), 0);
     }
 
-    void aTrainShowsEvenWhenMuted()
-    {
+    void aTrainShowsEvenWhenMuted() {
         Sounds sounds(false, "train");
         sounds.setMuted(true);
         QSignalSpy spy(&sounds, &Sounds::trainPassing);
@@ -484,8 +459,7 @@ private slots:
         QCOMPARE(spy.first().at(0).toInt(), Sounds::trainMilliseconds());
     }
 
-    void noSoundsAtDawnOrDusk()
-    {
+    void noSoundsAtDawnOrDusk() {
         Sounds sounds(false);
         sounds.setPeriodSource([] { return QString(); });
         QSignalSpy spy(&sounds, &Sounds::planeFlyover);
@@ -493,8 +467,7 @@ private slots:
         QVERIFY(!spy.wait(500));
     }
 
-    void emptyGardenStartsEmpty()
-    {
+    void emptyGardenStartsEmpty() {
         QTemporaryDir dir;
         Garden garden(dir.filePath("garden.json"));
         QCOMPARE(garden.rowCount(), 0);
@@ -504,8 +477,7 @@ private slots:
         QVERIFY(!QFile::exists(dir.filePath("garden.json")));
     }
 
-    void recordedPlantsSurviveARestartNewestFirst()
-    {
+    void recordedPlantsSurviveARestartNewestFirst() {
         QTemporaryDir dir;
         const QString path = dir.filePath("nested/garden.json");
         {
@@ -528,8 +500,7 @@ private slots:
         QVERIFY(again.problem().isEmpty());
     }
 
-    void twoGrovesOpenTogetherKeepEachOthersPlants()
-    {
+    void twoGrovesOpenTogetherKeepEachOthersPlants() {
         QTemporaryDir dir;
         const QString path = dir.filePath("garden.json");
         Garden first(path), second(path);
@@ -546,8 +517,7 @@ private slots:
         QVERIFY(!QFile::exists(path + ".lock"));
     }
 
-    void aGardenSpoiledWhileOpenIsNotSavedOver()
-    {
+    void aGardenSpoiledWhileOpenIsNotSavedOver() {
         QTemporaryDir dir;
         const QString path = dir.filePath("garden.json");
         Garden garden(path);
@@ -562,8 +532,7 @@ private slots:
         QCOMPARE(garden.rowCount(), 2);
     }
 
-    void unreadableGardenIsLeftUntouched()
-    {
+    void unreadableGardenIsLeftUntouched() {
         QTemporaryDir dir;
         const QString path = dir.filePath("garden.json");
         write(path, "this is not json");
@@ -577,8 +546,7 @@ private slots:
         QCOMPARE(file.readAll(), QByteArray("this is not json"));
     }
 
-    void gardenWithABadEntryIsNotOverwritten()
-    {
+    void gardenWithABadEntryIsNotOverwritten() {
         QTemporaryDir dir;
         const QString path = dir.filePath("garden.json");
         const QByteArray bad = R"({"version":1,"plants":[{"seed":1,"outcome":"sprouted"}]})";
@@ -591,8 +559,7 @@ private slots:
         QCOMPARE(file.readAll(), bad);
     }
 
-    void snowOnlyFallsInWinter()
-    {
+    void snowOnlyFallsInWinter() {
         auto snowShare = [](const QString &season) {
             QRandomGenerator random(5);
             int snow = 0;
@@ -606,8 +573,7 @@ private slots:
         QVERIFY(snowShare("winter") > 0.15);
     }
 
-    void snowIsSnowNotRain()
-    {
+    void snowIsSnowNotRain() {
         Weather weather("snow");
         weather.begin(1, QDate(2026, 1, 15));
         QCOMPARE(weather.kind(), QString("snow"));
@@ -618,24 +584,21 @@ private slots:
         QVERIFY(qAbs(weather.growth() - 0.5) < 0.01);
     }
 
-    void notifierSaysSoWhenThereIsNoService()
-    {
+    void notifierSaysSoWhenThereIsNoService() {
         Notifier notifier("org.grove.NoSuchService");
         QVERIFY(notifier.problem().isEmpty());
         notifier.plantGrown();
         QTRY_VERIFY_WITH_TIMEOUT(!notifier.problem().isEmpty(), 5000);
     }
 
-    void themeFallsBack()
-    {
+    void themeFallsBack() {
         QTemporaryDir dir;
         Theme theme(dir.path());
         QCOMPARE(theme.accent(), QString("#FFD60A"));
         QCOMPARE(theme.accentForeground(), QString("black"));
     }
 
-    void themeReadsAccent()
-    {
+    void themeReadsAccent() {
         QTemporaryDir dir;
         QDir(dir.path()).mkpath("theme");
         QFile colors(dir.path() + "/theme/colors.toml");
@@ -648,16 +611,14 @@ private slots:
         QCOMPARE(theme.accentForeground(), QString("white"));
     }
 
-    void translatorFallsBackToEnglish()
-    {
+    void translatorFallsBackToEnglish() {
         QTemporaryDir dir;
         Translator translator(dir.path() + "/language", dir.path());
-        QCOMPARE(translator.language(), QString("en"));
+        QCOMPARE(translator.languageCode(), QString("en"));
         QVERIFY(translator.translate("Main", "Quit").isNull());
     }
 
-    void problemsFromCppFollowTheLanguage()
-    {
+    void problemsFromCppFollowTheLanguage() {
         QTemporaryDir dir;
         const QByteArray message =
             "The garden file could not be read. It was left untouched, and new plants will not be saved.";
@@ -678,15 +639,14 @@ private slots:
         QCoreApplication::removeTranslator(&translator);
     }
 
-    void translatorFollowsTheLanguageFile()
-    {
+    void translatorFollowsTheLanguageFile() {
         QTemporaryDir dir;
         write(dir.path() + "/language", "pt-BR\n");
         write(dir.path() + "/pt.json", R"({"Quit": "Sair", "Keys": "Teclas"})");
         write(dir.path() + "/pt-BR.json", R"({"Quit": "Fechar"})");
 
         Translator translator(dir.path() + "/language", dir.path());
-        QCOMPARE(translator.language(), QString("pt-BR"));
+        QCOMPARE(translator.languageCode(), QString("pt-BR"));
         QCOMPARE(translator.translate("Main", "Quit"), QString("Fechar"));
         QCOMPARE(translator.translate("Main", "Keys"), QString("Teclas"));
     }
@@ -694,8 +654,7 @@ private slots:
     // Not a test of Grove: a leak planted for bin/check-leaks --canary, which
     // passes only if the leak check catches it, so a clean report means
     // something.
-    void leakCanary()
-    {
+    void leakCanary() {
         if (!qEnvironmentVariableIsSet("GROVE_LEAK_CANARY"))
             QSKIP("only for bin/check-leaks --canary");
         auto *lost = new QByteArray(1024, 'x');
@@ -703,8 +662,7 @@ private slots:
     }
 
 private:
-    static int peakOf(const QByteArray &pcm, int from, int to)
-    {
+    static int peakOf(const QByteArray &pcm, int from, int to) {
         const auto *samples = reinterpret_cast<const qint16 *>(pcm.constData());
         int peak = 0;
         for (int i = from; i < to && i < pcm.size() / 2; ++i)
@@ -712,8 +670,7 @@ private:
         return peak;
     }
 
-    static double rmsOf(const QByteArray &pcm, double fromSeconds, double toSeconds)
-    {
+    static double rmsOf(const QByteArray &pcm, double fromSeconds, double toSeconds) {
         const auto *samples = reinterpret_cast<const qint16 *>(pcm.constData());
         const int from = int(fromSeconds * 44100), to = int(toSeconds * 44100);
         double sum = 0;
@@ -722,8 +679,7 @@ private:
         return qSqrt(sum / (to - from));
     }
 
-    static Garden::Plant plant(int seed, const QString &outcome, double progress, int minutes)
-    {
+    static Garden::Plant plant(int seed, const QString &outcome, double progress, int minutes) {
         Garden::Plant p;
         p.seed = seed;
         p.outcome = outcome;
@@ -735,8 +691,7 @@ private:
         return p;
     }
 
-    static void write(const QString &path, const QByteArray &contents)
-    {
+    static void write(const QString &path, const QByteArray &contents) {
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.write(contents);

@@ -19,6 +19,9 @@ public:
     // `seconds` is the session length; tests and GROVE_SECONDS shorten it.
     explicit Backend(int seconds = 25 * 60, QObject *parent = nullptr);
 
+    // Seeds are drawn from 1 up to this, 2^30.
+    static constexpr int kSeedLimit = 0x4000'0000;
+
     // "idle", "growing", "done" or "wilted".
     QString state() const { return m_state; }
     double progress() const { return m_progress; }

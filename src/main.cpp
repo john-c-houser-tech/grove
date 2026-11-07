@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     // each one to the system when it goes.
     mallopt(M_MMAP_THRESHOLD, 128 * 1024);
 #endif
-    QGuiApplication application(argc, argv);
+    const QGuiApplication application(argc, argv);
     QGuiApplication::setApplicationName("grove");
     QGuiApplication::setApplicationVersion("0.8.2");
 

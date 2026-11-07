@@ -1,0 +1,58 @@
+# Static checks on Grove's C++, run by bin/lint; any finding fails it.
+#
+# Every family that finds bugs is on: bugprone, the Clang static analyzer
+# (including its leak and use-after-free checks), performance, modernize, and
+# most of readability, misc and the C++ Core Guidelines. A check is off only
+# when it fights how this code is meant to read, and the reason is below.
+#
+# Off, and why:
+#  - magic-numbers: the landscape, light and sound are tuned constants, each
+#    explained where it is used; naming every one would hide the numbers the
+#    comments talk about.
+#  - identifier-length: the drawing math uses W, H, u, t and x as geometry does.
+#  - math-missing-parentheses: precedence in arithmetic is not in doubt.
+#  - braces-around-statements, isolate-declaration, trailing-comma,
+#    avoid-nested-conditional-operator: house style (CODING_STANDARDS.md)
+#    allows an unbraced single statement, several related declarations on one
+#    line, and a chain of conditions that reads as a table.
+#  - function-cognitive-complexity: each paint() is one picture drawn in
+#    order, best read top to bottom rather than split into fragments.
+#  - easily-swappable-parameters: geometry takes several doubles in a row.
+#  - include-cleaner: Qt's headers include one another in ways it cannot map.
+#  - non-private-member-variables: the Look structs are plain values on
+#    purpose, copied to the drawing thread whole.
+#  - owning-memory: Qt objects are owned by their parent, not by a gsl::owner.
+#  - pro-bounds-avoid-unchecked-container-access, pro-bounds-pointer-arithmetic,
+#    pro-bounds-constant-array-index: indexing within loops bounded by the
+#    container's own size, and scanning raw PCM and image rows, which
+#    AddressSanitizer checks at run time in bin/check-leaks.
+#  - modernize-use-trailing-return-type: not this code's style.
+#  - modernize-use-nodiscard: Qt's getters do not use it, and ours follow them.
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  modernize-*,
+  readability-*,
+  misc-*,
+  cppcoreguidelines-*,
+  -*-magic-numbers,
+  -readability-identifier-length,
+  -readability-math-missing-parentheses,
+  -readability-braces-around-statements,
+  -readability-isolate-declaration,
+  -readability-trailing-comma,
+  -readability-avoid-nested-conditional-operator,
+  -readability-function-cognitive-complexity,
+  -bugprone-easily-swappable-parameters,
+  -misc-include-cleaner,
+  -*-non-private-member-variables-in-classes,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*/grove/src/.*'

@@ -42,7 +42,7 @@ class Light : public QObject {
 
 public:
     // A valid `fixed` time freezes the clock, for screenshots and tests.
-    explicit Light(const QDateTime &fixed = {}, QObject *parent = nullptr);
+    explicit Light(QDateTime fixed = {}, QObject *parent = nullptr);
 
     QColor skyTop() const { return m_sky.top; }
     QColor skyBottom() const { return m_sky.bottom; }

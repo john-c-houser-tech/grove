@@ -1,6 +1,7 @@
 #include "weather.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 #include "easing.h"
@@ -35,9 +36,15 @@ Weather::Conditions Weather::conditions(const QString &kind) {
 QString Weather::seasonOf(const QDate &date) {
     // Northern hemisphere, by calendar month.
     switch (date.month()) {
-    case 3: case 4: case 5: return "spring";
-    case 6: case 7: case 8: return "summer";
-    case 9: case 10: case 11: return "autumn";
+    case 3:
+    case 4:
+    case 5: return "spring";
+    case 6:
+    case 7:
+    case 8: return "summer";
+    case 9:
+    case 10:
+    case 11: return "autumn";
     default: return "winter";
     }
 }
@@ -46,9 +53,10 @@ QString Weather::pickKind(QRandomGenerator &random, const QString &season) {
     static const QStringList kinds{"clear", "cloudy", "rain", "fog", "snow"};
     // Weights for clear, cloudy, rain, fog and snow. Summer is mostly clear,
     // autumn is the foggy season, and only winter brings snow.
-    static const double spring[5] = {3, 3, 3, 1, 0}, summer[5] = {6, 2, 0.7, 0.5, 0}, autumn[5] = {2, 3, 3, 2.5, 0},
-                        winter[5] = {1, 3, 1.5, 2, 2.5};
-    const double *w = season == "summer" ? summer : season == "autumn" ? autumn : season == "winter" ? winter : spring;
+    using Weights = std::array<double, 5>;
+    static constexpr Weights spring{3, 3, 3, 1, 0}, summer{6, 2, 0.7, 0.5, 0}, autumn{2, 3, 3, 2.5, 0},
+        winter{1, 3, 1.5, 2, 2.5};
+    const Weights &w = season == "summer" ? summer : season == "autumn" ? autumn : season == "winter" ? winter : spring;
     double pick = random.generateDouble() * (w[0] + w[1] + w[2] + w[3] + w[4]);
     for (int i = 0; i < 5; ++i) {
         if (pick < w[i])

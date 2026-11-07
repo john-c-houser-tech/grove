@@ -15,13 +15,15 @@
 // CLDR category ({"one": "%n klip", "other": "%n klip"}).
 class Translator : public QTranslator {
     Q_OBJECT
-    Q_PROPERTY(QString language READ language NOTIFY changed)
+    Q_PROPERTY(QString language READ languageCode NOTIFY changed)
 
 public:
-    explicit Translator(const QString &languageFile = {}, const QString &catalogDirectory = ":/i18n",
+    explicit Translator(const QString &languageFile = {}, QString catalogDirectory = ":/i18n",
                         QObject *parent = nullptr);
 
-    QString language() const { return m_language; }
+    // The Omarchy language code ("en", "pt-BR"). Not QTranslator::language(),
+    // which names the language of a compiled .qm catalog.
+    QString languageCode() const { return m_language; }
     bool isEmpty() const override { return m_strings.isEmpty(); }
     QString translate(const char *context, const char *sourceText, const char *disambiguation = nullptr,
                       int n = -1) const override;

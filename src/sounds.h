@@ -21,6 +21,7 @@
 // the sound but not the picture.
 class Sounds : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(Sounds)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     Q_PROPERTY(QString problem READ problem NOTIFY problemChanged)
 

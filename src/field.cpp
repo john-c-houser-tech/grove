@@ -122,7 +122,9 @@ void Field::paint(QPainter &p, const Look &look, double W, double H) {
     const auto shift = [&](int j, double d) {
         return wave(d) - wave(kPlantDepth) + 0.012 * (noise(d * 0.6 + j * 7.7, 22) - 0.5);
     };
-    const auto crestHeight = [](int j, double d) { return kRidgeHeight * (0.85 + 0.3 * noise(d * 0.9 + j * 13.1, 21)); };
+    const auto crestHeight = [](int j, double d) {
+        return kRidgeHeight * (0.85 + 0.3 * noise(d * 0.9 + j * 13.1, 21));
+    };
 
     // Crests sit half a row either side of the plant's trough. Only the side of
     // each ridge that turns toward us can be seen, so the outer rows are drawn
@@ -229,9 +231,11 @@ void Field::paint(QPainter &p, const Look &look, double W, double H) {
                 continue;
             const int bn = std::max(1, std::min(bands, static_cast<int>(std::round(bwide / 4))));
             for (int bb = bn - 1; bb >= 0; --bb) {
-                const double b0 = static_cast<double>(bb) / bn * backReach, b1 = static_cast<double>(bb + 1) / bn * backReach;
+                const double b0 = static_cast<double>(bb) / bn * backReach,
+                             b1 = static_cast<double>(bb + 1) / bn * backReach;
                 const double bm = (b0 + b1) / 2;
-                strip(-side, b0, b1, mix(tone(brightness(bm, !facingLight) * 1.15, profile(bm)), distantTone, bhaze), blo, bhi);
+                strip(-side, b0, b1, mix(tone(brightness(bm, !facingLight) * 1.15, profile(bm)), distantTone, bhaze),
+                      blo, bhi);
             }
         }
 
@@ -249,7 +253,8 @@ void Field::paint(QPainter &p, const Look &look, double W, double H) {
             for (int band = 0; band < fn; ++band) {
                 const double t0 = static_cast<double>(band) / fn, t1 = static_cast<double>(band + 1) / fn;
                 const double tm = (t0 + t1) / 2;
-                strip(side, t0, t1, mix(tone(brightness(tm, facingLight) * 1.15, profile(tm)), distantTone, haze), lo, hi);
+                strip(side, t0, t1, mix(tone(brightness(tm, facingLight) * 1.15, profile(tm)), distantTone, haze), lo,
+                      hi);
             }
         }
 

@@ -50,8 +50,8 @@ Road road(const QPointF &p0, const QPointF &p1, const QPointF &p2, const QPointF
         const double shrink = 1 - farther * t;
         const double half = H * (0.006 + 0.019 * toward) * shrink;
         const double nx = -dy / len, ny = dx / len;
-        r.upper.push_back({at.x() + nx * half, at.y() + ny * half * (1 - toward) - (1 - toward) * half * 0.2});
-        r.lower.push_back({at.x() - nx * half, at.y() - ny * half * (1 - toward) + (1 - toward) * half * 0.2});
+        r.upper.emplace_back(at.x() + nx * half, at.y() + ny * half * (1 - toward) - (1 - toward) * half * 0.2);
+        r.lower.emplace_back(at.x() - nx * half, at.y() - ny * half * (1 - toward) + (1 - toward) * half * 0.2);
     }
     return r;
 }
@@ -63,8 +63,8 @@ TrackBed::TrackBed(QQuickItem *parent) : PaintedLayer(parent) {
 }
 
 PaintedLayer::Painting TrackBed::painting() const {
-    const Look look{m_horizon, m_crossingX, m_floorColor, m_ballastColor, m_railColor, m_roadColor,
-                    m_cutColor, m_fillColor, m_hillColor, m_hazeColor};
+    const Look look{m_horizon,   m_crossingX, m_floorColor, m_ballastColor, m_railColor,
+                    m_roadColor, m_cutColor,  m_fillColor,  m_hillColor,    m_hazeColor};
     return [look](QPainter &p, double W, double H) { paint(p, look, W, H); };
 }
 
@@ -75,8 +75,9 @@ void TrackBed::paint(QPainter &p, const Look &look, double W, double H) {
     const auto line = [&] {
         QPainterPath path;
         path.setFillRule(Qt::WindingFill);
-        for (double x = 0; x <= W; x += 4)
-            x == 0 ? path.moveTo(x, ty) : path.lineTo(x, ty);
+        path.moveTo(0, ty);
+        for (int i = 1; 4.0 * i <= W; ++i)
+            path.lineTo(4.0 * i, ty);
         return path;
     };
     {
@@ -135,7 +136,7 @@ void TrackBed::paint(QPainter &p, const Look &look, double W, double H) {
     for (int c = cutFrom; c < n; ++c) {
         const double tc = (along(c) - along(cutFrom)) / (1 - along(cutFrom));
         const double tall = H * (0.004 + 0.02 * std::sin(M_PI * 0.5 * std::min(1.0, tc * 1.6))) * (1 - 0.35 * tc);
-        cutTop.push_back({edges.upper[c].x() - W * 0.003 * tc, edges.upper[c].y() - tall});
+        cutTop.emplace_back(edges.upper[c].x() - W * 0.003 * tc, edges.upper[c].y() - tall);
     }
     {
         QPainterPath cut;
@@ -150,7 +151,8 @@ void TrackBed::paint(QPainter &p, const Look &look, double W, double H) {
     }
     // Rain has scored the cut with short runnels down its face.
     {
-        p.setPen(pen(rgba(look.cutColor.redF() * 0.82, look.cutColor.greenF() * 0.82, look.cutColor.blueF() * 0.82, 0.45), 1));
+        p.setPen(pen(
+            rgba(look.cutColor.redF() * 0.82, look.cutColor.greenF() * 0.82, look.cutColor.blueF() * 0.82, 0.45), 1));
         p.setBrush(Qt::NoBrush);
         for (int r2 = 3; r2 < static_cast<int>(cutTop.size()) - 2; r2 += 5) {
             const QPointF topPt = cutTop[r2], footPt = edges.upper[cutFrom + r2];

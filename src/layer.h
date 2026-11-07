@@ -43,7 +43,7 @@ protected:
     // properties change meanwhile.
     void scheduleRender();
 
-    QSGNode *updatePaintNode(QSGNode *old, UpdatePaintNodeData *) override;
+    QSGNode *updatePaintNode(QSGNode *old, UpdatePaintNodeData *data) override;
     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
     void itemChange(ItemChange change, const ItemChangeData &value) override;
 

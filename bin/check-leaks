@@ -6,8 +6,8 @@
 #    driven offscreen by the scene tests). Any leak, memory error or undefined
 #    behaviour fails. No leak is suppressed.
 # 2. The soak test on a normal build: memory that stays referenced but is never
-#    let go escapes the leak checker, so the heap is measured over forty rounds
-#    of each part of a day and must not grow.
+#    let go escapes the leak checker, so the heap is read after each of forty
+#    rounds of each part of a day, and must not keep rising.
 #
 #   bin/check-leaks           the check
 #   bin/check-leaks --canary  proves the check works: plants a leak in a unit
@@ -72,7 +72,7 @@ if [ "$canary" = 1 ]; then
         echo "canary: memory kept in the soak test was NOT caught"
         exit 1
     fi
-    echo "canary: memory kept in the soak test was caught ($(grep -oE 'heap grew by [0-9]+ bytes' "$build/soak.log"))"
+    echo "canary: memory kept in the soak test was caught ($(grep -m1 -oE '[0-9]+ bytes a round' "$build/soak.log"))"
     exit 0
 fi
 if GROVE_SOAK=1 ./scene_tests repeatingTheDayDoesNotGrowTheHeap >"$build/soak.log" 2>&1; then

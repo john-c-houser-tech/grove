@@ -1,0 +1,33 @@
+#!/bin/sh
+# Every static check, any finding fails: the formatting, the compiler's
+# warnings, clang-tidy, and the translation catalogs. The memory checks are in
+# bin/check-leaks, the tests in bin/test, and bin/check runs all three.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+cd "$ROOT"
+CXX_FILES="src/*.cpp src/*.h tests/*.cpp"
+
+echo "formatting (.clang-format)"
+# shellcheck disable=SC2086
+clang-format --dry-run --Werror $CXX_FILES
+
+echo "compiler warnings, as errors"
+mkdir -p build/lint
+cd build/lint
+qmake6 "$ROOT/grove.pro" "QMAKE_CXXFLAGS+=-Werror" >/dev/null
+make -j"$(nproc)" >/dev/null
+
+echo "clang-tidy (.clang-tidy)"
+# qmake writes no compile_commands.json, so the defines and include paths come
+# from the Makefile it generated, read from where it was generated.
+defines=$(sed -n 's/^DEFINES *= *//p' Makefile)
+includes=$(sed -n 's/^INCPATH *= *//p' Makefile)
+# shellcheck disable=SC2086
+clang-tidy --quiet "$ROOT"/src/*.cpp -- -std=c++17 -fPIC $defines $includes
+
+echo "translation catalogs"
+cd "$ROOT"
+bin/check-i18n
+
+echo "lint passed"

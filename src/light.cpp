@@ -10,8 +10,9 @@
 namespace {
 
 QColor mix(const QColor &a, const QColor &b, double t) {
-    return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t,
-                            a.blueF() + (b.blueF() - a.blueF()) * t);
+    const auto towards = [t](float from, float to) { return static_cast<float>(from + (to - from) * t); };
+    return QColor::fromRgbF(towards(a.redF(), b.redF()), towards(a.greenF(), b.greenF()),
+                            towards(a.blueF(), b.blueF()));
 }
 
 struct Stop {
@@ -69,12 +70,9 @@ Sky Light::sky(const QDateTime &when, const QColor &accent) {
     // The horizon at golden hour is the warm colour, pulled toward the accent.
     const QColor warm = mix(QColor("#e8905a"), accent, 0.45);
     const std::vector<Stop> stops = {
-        {-0.40, QColor("#060a14"), QColor("#0e1624")},
-        {-0.15, QColor("#0b1226"), QColor("#1c1f3a")},
-        {-0.02, QColor("#1d2550"), QColor("#6a4660")},
-        {0.06, QColor("#33497a"), warm},
-        {0.25, QColor("#4a78a8"), QColor("#9fc0cc")},
-        {1.00, QColor("#3d6f9c"), QColor("#8fb4c8")},
+        {-0.40, QColor("#060a14"), QColor("#0e1624")}, {-0.15, QColor("#0b1226"), QColor("#1c1f3a")},
+        {-0.02, QColor("#1d2550"), QColor("#6a4660")}, {0.06, QColor("#33497a"), warm},
+        {0.25, QColor("#4a78a8"), QColor("#9fc0cc")},  {1.00, QColor("#3d6f9c"), QColor("#8fb4c8")},
     };
     s.top = along(stops, s.elevation, true);
     s.bottom = along(stops, s.elevation, false);
@@ -86,7 +84,7 @@ Sky Light::sky(const QDateTime &when, const QColor &accent) {
     return s;
 }
 
-Light::Light(const QDateTime &fixed, QObject *parent) : QObject(parent), m_fixed(fixed) {
+Light::Light(QDateTime fixed, QObject *parent) : QObject(parent), m_fixed(std::move(fixed)) {
     // The sky moves slowly; twice a minute is smooth enough to never notice.
     m_timer.setInterval(30000);
     connect(&m_timer, &QTimer::timeout, this, &Light::update);
@@ -97,12 +95,12 @@ Light::Light(const QDateTime &fixed, QObject *parent) : QObject(parent), m_fixed
 
 QColor Light::warmTint() const {
     QColor c = m_sky.warmTint;
-    c.setAlphaF(clamp01(m_sky.warmth * 0.2));
+    c.setAlphaF(static_cast<float>(clamp01(m_sky.warmth * 0.2)));
     return c;
 }
 
 QColor Light::nightTint() const {
-    return QColor::fromRgbF(0.02, 0.04, 0.12, (1 - m_sky.ambient) * 0.62);
+    return QColor::fromRgbF(0.02F, 0.04F, 0.12F, static_cast<float>((1 - m_sky.ambient) * 0.62));
 }
 
 void Light::setAccent(const QColor &accent) {

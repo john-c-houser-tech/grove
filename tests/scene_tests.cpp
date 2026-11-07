@@ -23,38 +23,33 @@ class SceneTests : public QObject {
 
 private slots:
     // Each test starts from nothing: a garden, theme and language of its own.
-    void init()
-    {
+    void init() {
         m_dir = std::make_unique<QTemporaryDir>();
         QVERIFY(m_dir->isValid());
         // Any warning is a failure: a binding loop or a QML error is a bug
         // even when the window still looks right.
         QTest::failOnWarning(QRegularExpression(".*"));
     }
-    void cleanup()
-    {
+    void cleanup() {
         m_app.reset();
         m_dir.reset();
     }
 
-    void spacePlantsASeed()
-    {
+    void spacePlantsASeed() {
         start();
         QCOMPARE(m_app->backend().state(), QString("idle"));
         press(Qt::Key_Space);
         QCOMPARE(m_app->backend().state(), QString("growing"));
     }
 
-    void aSessionRunsToTheEndAndIsKept()
-    {
+    void aSessionRunsToTheEndAndIsKept() {
         start(2);
         press(Qt::Key_Space);
         QTRY_COMPARE_WITH_TIMEOUT(m_app->backend().state(), QString("done"), 5000);
         QCOMPARE(m_app->garden().grown(), 1);
     }
 
-    void givingUpAsksFirstAndWiltsThePlant()
-    {
+    void givingUpAsksFirstAndWiltsThePlant() {
         start();
         press(Qt::Key_Space);
         press(Qt::Key_Space);
@@ -67,8 +62,7 @@ private slots:
         QCOMPARE(m_app->garden().wilted(), 1);
     }
 
-    void theGardenOpensTakesTheKeysAndCloses()
-    {
+    void theGardenOpensTakesTheKeysAndCloses() {
         start();
         for (int seed = 1; seed <= 3; ++seed)
             m_app->garden().record(plant(seed));
@@ -89,8 +83,7 @@ private slots:
         QTRY_VERIFY(!loader->property("item").value<QObject *>());
     }
 
-    void theLandscapeIsDrawn()
-    {
+    void theLandscapeIsDrawn() {
         start();
         // The layers draw on another thread; the field brings many tones to
         // the bottom of the window once it is there.
@@ -100,20 +93,19 @@ private slots:
     }
 
     // Memory still referenced but never let go, which no leak checker sees,
-    // shows as a heap that keeps growing: forty rounds of opening the garden,
-    // giving up or finishing must leave it within a megabyte of where it was.
-    // A landscape picture is megabytes and a garden tile with its plant a
-    // hundred kilobytes, so losing one a round would show; the allocator's own
-    // churn is a few hundred kilobytes either way. It takes a minute or more,
-    // so bin/check-leaks runs it (GROVE_SOAK=1) rather than bin/test.
-    void repeatingTheDayDoesNotGrowTheHeap_data()
-    {
+    // shows as a heap that keeps growing. The heap is read after each of forty
+    // rounds of opening the garden, giving up or finishing, once garbage is
+    // collected and deferred deletes are done, and the line through those
+    // readings must rise less than 10 KB a round. A garden tile with its plant
+    // is about 100 KB, so losing one a round would show; caches filling up
+    // early and then holding steady do not. It takes a minute or more, so
+    // bin/check-leaks runs it (GROVE_SOAK=1) rather than bin/test.
+    void repeatingTheDayDoesNotGrowTheHeap_data() {
         QTest::addColumn<QString>("part");
         for (const char *part : {"garden", "giveup", "finish"})
             QTest::newRow(part) << QString(part);
     }
-    void repeatingTheDayDoesNotGrowTheHeap()
-    {
+    void repeatingTheDayDoesNotGrowTheHeap() {
         if (!qEnvironmentVariableIsSet("GROVE_SOAK"))
             QSKIP("set GROVE_SOAK=1 to run; bin/check-leaks does");
         if (heapInUse() == 0)
@@ -146,21 +138,22 @@ private slots:
         // show that the test sees memory kept like that.
         const bool canary = qEnvironmentVariableIsSet("GROVE_LEAK_CANARY");
         QList<QByteArray> kept;
-        const qint64 before = settledHeap();
+        QList<qint64> heap;
         for (int i = 0; i < times; ++i) {
             once();
             if (canary)
                 kept.append(QByteArray(100 * 1024, 'x'));
+            heap.append(settledHeap());
         }
-        const qint64 grown = settledHeap() - before;
-        qInfo("%s x%d: heap grew by %lld bytes", qPrintable(part), times, grown);
-        QVERIFY2(grown < 1024 * 1024, qPrintable(QString("grew by %1 bytes").arg(grown)));
+        const double perRound = slope(heap);
+        qInfo("%s x%d: heap grew by %lld bytes, %.0f bytes a round", qPrintable(part), times,
+              heap.constLast() - heap.constFirst(), perRound);
+        QVERIFY2(perRound < 10 * 1024, qPrintable(QString("rising %1 bytes a round").arg(perRound)));
     }
 
     // Not a test: with GROVE_SHOTS set to a directory, saves the scene at
     // several hours, seasons and weathers there for a person to look at.
-    void framesForReview()
-    {
+    void framesForReview() {
         const QString out = qEnvironmentVariable("GROVE_SHOTS");
         if (out.isEmpty())
             QSKIP("set GROVE_SHOTS to a directory to save frames");
@@ -171,7 +164,7 @@ private slots:
         const Scene scenes[] = {
             {"summer-noon", "2026-07-01", "12:00", "clear"}, {"summer-dusk", "2026-07-01", "20:40", "clear"},
             {"winter-noon", "2026-01-15", "12:00", "clear"}, {"night", "2026-07-01", "01:00", "clear"},
-            {"rain", "2026-07-01", "12:00", "rain"},          {"snow", "2026-01-15", "12:00", "snow"},
+            {"rain", "2026-07-01", "12:00", "rain"},         {"snow", "2026-01-15", "12:00", "snow"},
             {"fog", "2026-10-15", "09:00", "fog"},
         };
         for (const Scene &scene : scenes) {
@@ -194,8 +187,7 @@ private slots:
     }
 
 private:
-    App::Options baseOptions(int seconds) const
-    {
+    App::Options baseOptions(int seconds) const {
         App::Options options;
         options.seconds = seconds;
         options.date = QDate(2026, 7, 1);
@@ -212,8 +204,7 @@ private:
     }
 
     void start(int seconds = 10) { start(baseOptions(seconds)); }
-    void start(const App::Options &options)
-    {
+    void start(const App::Options &options) {
         m_app = std::make_unique<App>(options);
         m_app->sounds().setMuted(true);
         QVERIFY(m_app->load());
@@ -222,8 +213,8 @@ private:
 
     void press(Qt::Key key) { QTest::keyClick(m_app->window(), key); }
 
-    template <typename T> T *find(const char *name) const
-    {
+    template <typename T>
+    T *find(const char *name) const {
         T *found = m_app->window()->findChild<T *>(name);
         if (!found)
             qFatal("no item named %s", name);
@@ -232,8 +223,7 @@ private:
 
     // The heap once JavaScript garbage is collected and deferred deletes are
     // done, so only what is really kept is counted.
-    qint64 settledHeap()
-    {
+    qint64 settledHeap() {
         for (int i = 0; i < 3; ++i) {
             m_app->engine()->collectGarbage();
             QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
@@ -242,10 +232,24 @@ private:
         return heapInUse();
     }
 
+    // The slope of the least-squares line through the readings, per reading.
+    static double slope(const QList<qint64> &values) {
+        const auto n = static_cast<double>(values.size());
+        double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (int i = 0; i < values.size(); ++i) {
+            const auto x = static_cast<double>(i);
+            const auto y = static_cast<double>(values[i]);
+            sumX += x;
+            sumY += y;
+            sumXY += x * y;
+            sumXX += x * x;
+        }
+        return (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    }
+
     // Bytes the program holds from the heap, including large blocks mapped on
     // their own; zero where glibc is not there to ask.
-    static qint64 heapInUse()
-    {
+    static qint64 heapInUse() {
 #ifdef __GLIBC__
         const struct mallinfo2 info = mallinfo2();
         return static_cast<qint64>(info.uordblks + info.hblkhd);
@@ -258,8 +262,7 @@ private:
 
     // How many different colours there are in a band of the window, given as
     // fractions of its height.
-    static int tonesIn(const QImage &image, double from, double to)
-    {
+    static int tonesIn(const QImage &image, double from, double to) {
         QSet<QRgb> tones;
         for (int y = int(image.height() * from); y < int(image.height() * to); y += 2)
             for (int x = 0; x < image.width(); x += 2)
@@ -268,8 +271,7 @@ private:
     }
 
     // The border colour of the tile that has the keys.
-    static QColor currentTileBorder(QQuickItem *grid)
-    {
+    static QColor currentTileBorder(QQuickItem *grid) {
         const auto *tile = grid->property("currentItem").value<QQuickItem *>();
         if (!tile || tile->childItems().isEmpty())
             return {};
@@ -277,8 +279,7 @@ private:
         return border ? border->property("color").value<QColor>() : QColor();
     }
 
-    static Garden::Plant plant(int seed)
-    {
+    static Garden::Plant plant(int seed) {
         Garden::Plant p;
         p.seed = seed;
         p.outcome = seed % 2 ? "done" : "wilted";

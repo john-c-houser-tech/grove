@@ -42,11 +42,11 @@ class Field : public PaintedLayer {
 
 public:
     struct Look {
-        double horizon, groundTop, vanishX, plantX;
+        double horizon = 0, groundTop = 0, vanishX = 0, plantX = 0;
         QString part;
         QColor soilColor, hazeColor;
-        double snow;
-        bool frost;
+        double snow = 0;
+        bool frost = false;
     };
 
     explicit Field(QQuickItem *parent = nullptr);

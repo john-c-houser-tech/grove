@@ -1,8 +1,12 @@
 # Everything but main(), shared by the app and its two test programs, so a new
 # file is added in one place.
 QT += core gui qml quick quickcontrols2 dbus multimedia concurrent network
-CONFIG += c++17
+CONFIG += c++17 warn_on
 INCLUDEPATH += $$PWD
+# Beyond qmake's -Wall -Wextra. bin/lint builds with -Werror as well, so a
+# warning fails the check without breaking a packager's build on a newer
+# compiler.
+QMAKE_CXXFLAGS += -Wpedantic -Wshadow
 
 HEADERS += \
     $$PWD/app.h \

@@ -14,7 +14,7 @@ class Notifier : public QObject {
 
 public:
     // `service` is only changed by tests.
-    explicit Notifier(const QString &service = "org.freedesktop.Notifications", QObject *parent = nullptr);
+    explicit Notifier(QString service = "org.freedesktop.Notifications", QObject *parent = nullptr);
 
     // Empty when notifications work, otherwise why they cannot (shown in the window).
     QString problem() const { return m_problem.text(); }

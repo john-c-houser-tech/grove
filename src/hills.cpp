@@ -20,9 +20,14 @@ namespace {
 struct Peak {
     double at, top, left, right;
 };
-constexpr std::array<Peak, 8> kPeaks{{{0.0, 0.25, 1.3, 1.4}, {0.17, 0.27, 1.4, 1.5}, {0.32, 0.29, 1.5, 1.4},
-                                      {0.465, 0.335, 1.6, 1.7}, {0.585, 0.305, 1.5, 1.5}, {0.71, 0.285, 1.4, 1.3},
-                                      {0.85, 0.265, 1.3, 1.5}, {1.0, 0.25, 1.4, 1.3}}};
+constexpr std::array<Peak, 8> kPeaks{{{0.0, 0.25, 1.3, 1.4},
+                                      {0.17, 0.27, 1.4, 1.5},
+                                      {0.32, 0.29, 1.5, 1.4},
+                                      {0.465, 0.335, 1.6, 1.7},
+                                      {0.585, 0.305, 1.5, 1.5},
+                                      {0.71, 0.285, 1.4, 1.3},
+                                      {0.85, 0.265, 1.3, 1.5},
+                                      {1.0, 0.25, 1.4, 1.3}}};
 
 // A rounded, blunt summit that steepens into straight flanks.
 double peakHeight(const Peak &p, double u) {
@@ -58,8 +63,10 @@ QPainterPath skyline(const std::function<double(double, double)> &heightAt, doub
     QPainterPath path;
     path.setFillRule(Qt::WindingFill);
     path.moveTo(0, H);
-    for (double x = 0; x <= W; x += 4)
+    for (int i = 0; 4.0 * i <= W; ++i) {
+        const double x = 4.0 * i;
         path.lineTo(x, y0 - heightAt(x / W, H));
+    }
     path.lineTo(W, H);
     path.closeSubpath();
     return path;
@@ -82,8 +89,8 @@ Hills::Hills(QQuickItem *parent) : PaintedLayer(parent) {
 }
 
 PaintedLayer::Painting Hills::painting() const {
-    const Look look{m_horizon, m_part, m_snowline, m_farColor, m_midColor, m_nearColor, m_hazeColor,
-                    m_shadeColor, m_forestColor, m_shadowSide, m_relief, m_snowCover, m_snowColor};
+    const Look look{m_horizon,    m_part,        m_snowline,   m_farColor, m_midColor,  m_nearColor, m_hazeColor,
+                    m_shadeColor, m_forestColor, m_shadowSide, m_relief,   m_snowCover, m_snowColor};
     return [look](QPainter &p, double W, double H) { paint(p, look, W, H); };
 }
 
@@ -109,11 +116,13 @@ void Hills::paint(QPainter &p, const Look &look, double W, double H) {
         cap.setFillRule(Qt::WindingFill);
         cap.moveTo(0, 0);
         cap.lineTo(W, 0);
-        for (double sx = W; sx >= 0; sx -= 4) {
+        for (int i = 0; W - 4.0 * i >= 0; ++i) {
+            const double sx = W - 4.0 * i;
             const double u = sx / W;
             // Each face holds its snow differently: some low, some high.
-            const double wobble = H * (0.06 * (noise(u * 7, 7) - 0.5) + 0.03 * (noise(u * 23, 13) - 0.5)
-                                       + 0.012 * (noise(u * 60, 8) - 0.5));
+            const double wobble = H
+                                  * (0.06 * (noise(u * 7, 7) - 0.5) + 0.03 * (noise(u * 23, 13) - 0.5)
+                                     + 0.012 * (noise(u * 60, 8) - 0.5));
             cap.lineTo(sx, snowY + wobble);
         }
         cap.closeSubpath();
@@ -130,18 +139,17 @@ void Hills::paint(QPainter &p, const Look &look, double W, double H) {
     if (look.relief > 0.01) {
         const QColor shade = withAlpha(look.shadeColor, look.relief);
         const QColor rib = withAlpha(look.shadeColor, look.relief * 0.45);
-        for (size_t pk = 0; pk < kPeaks.size(); ++pk) {
+        for (int pk = 0; pk < static_cast<int>(kPeaks.size()); ++pk) {
             const Peak &peak = kPeaks[pk];
             const int side = look.shadowSide;
             const double su = peak.at;
-            // Along the skyline to the low point before the next peak.
-            double eu = su, prevH = far(su, H);
-            for (int k = 0; k < 60; ++k) {
-                const double nu = eu + side * 0.003;
-                const double nh = far(nu, H);
-                if (nh > prevH + 0.5 && k > 4)
+            // Along the skyline, in steps, to the low point before the next peak.
+            const double step = side * 0.003;
+            int steps = 0;
+            for (double prevH = far(su, H); steps < 60; ++steps) {
+                const double nh = far(su + step * (steps + 1), H);
+                if (nh > prevH + 0.5 && steps > 4)
                     break;
-                eu = nu;
                 prevH = nh;
             }
             const double top = y0 - far(su, H);
@@ -149,8 +157,8 @@ void Hills::paint(QPainter &p, const Look &look, double W, double H) {
             QPainterPath face;
             face.setFillRule(Qt::WindingFill);
             face.moveTo(W * su, top);
-            for (double wu = su; side > 0 ? wu <= eu : wu >= eu; wu += side * 0.003)
-                face.lineTo(W * wu, y0 - far(wu, H));
+            for (int k = 0; k <= steps; ++k)
+                face.lineTo(W * (su + step * k), y0 - far(su + step * k, H));
             // From the notch down a diagonal to the foot of the spur, then back
             // up the spur, a little bowed, to the summit.
             face.lineTo(W * footU, y0 - H * 0.1);
@@ -182,10 +190,11 @@ void Hills::paint(QPainter &p, const Look &look, double W, double H) {
         QPainterPath forest;
         forest.setFillRule(Qt::WindingFill);
         forest.moveTo(0, H);
-        for (double fx = 0; fx <= W; fx += 3) {
+        for (int i = 0; 3.0 * i <= W; ++i) {
+            const double fx = 3.0 * i;
             const double fu = fx / W;
             const double line = 0.14 + 0.022 * noise(fu * 9, 16) + 0.01 * noise(fu * 31, 17);
-            const double tips = 0.006 * (hash(std::floor(fx / 3), 18) - 0.5);
+            const double tips = 0.006 * (hash(i, 18) - 0.5);
             forest.lineTo(fx, y0 - H * (line + tips));
         }
         forest.lineTo(W, H);
@@ -197,7 +206,7 @@ void Hills::paint(QPainter &p, const Look &look, double W, double H) {
     // on the side out of the sun: thin, ragged streaks down the fall line,
     // with a few patches beside them. Short and few in summer, long and many
     // in winter.
-    for (size_t pp = 0; pp < kPeaks.size(); ++pp) {
+    for (int pp = 0; pp < static_cast<int>(kPeaks.size()); ++pp) {
         const Peak &peak = kPeaks[pp];
         const int gullies = 1 + static_cast<int>(std::round(2 * look.snowCover));
         for (int n = 0; n < gullies + 1; ++n) {
@@ -236,7 +245,8 @@ void Hills::paint(QPainter &p, const Look &look, double W, double H) {
             // Patches lying beside the gully.
             for (int pb = 0; pb < 2; ++pb) {
                 const double bt = 0.2 + 0.5 * hash(seed, 70 + pb);
-                const double bx = gx + drift * bt + pside * H * (0.006 + 0.006 * hash(seed, 72 + pb)) * (pb == 0 ? 1 : -1);
+                const double bx =
+                    gx + drift * bt + pside * H * (0.006 + 0.006 * hash(seed, 72 + pb)) * (pb == 0 ? 1 : -1);
                 const double by = gy + len * bt;
                 const double bsize = H * (0.002 + 0.003 * hash(seed, 74 + pb)) * (0.6 + look.snowCover);
                 QPainterPath patch;

@@ -26,7 +26,7 @@ class TrackBed : public PaintedLayer {
 
 public:
     struct Look {
-        double horizon, crossingX;
+        double horizon = 0, crossingX = 0;
         QColor floorColor, ballastColor, railColor, roadColor, cutColor, fillColor, hillColor, hazeColor;
     };
 

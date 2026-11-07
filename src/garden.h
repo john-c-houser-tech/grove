@@ -3,6 +3,7 @@
 #include <QAbstractListModel>
 #include <QDateTime>
 #include <QString>
+#include <cstdint>
 #include <vector>
 
 #include "problem.h"
@@ -28,7 +29,16 @@ public:
         int minutes = 0;
     };
 
-    enum Roles { SeedRole = Qt::UserRole + 1, OutcomeRole, SeasonRole, WeatherRole, ProgressRole, WhenRole, MinutesRole };
+    // Qt's models take roles as ints, so these stay a plain enum.
+    enum Roles : int { // NOLINT(cppcoreguidelines-use-enum-class,performance-enum-size)
+        SeedRole = Qt::UserRole + 1,
+        OutcomeRole,
+        SeasonRole,
+        WeatherRole,
+        ProgressRole,
+        WhenRole,
+        MinutesRole
+    };
 
     // An empty path means the user's data directory.
     explicit Garden(const QString &path = {}, QObject *parent = nullptr);
@@ -53,7 +63,7 @@ signals:
     void problemChanged();
 
 private:
-    enum class Read { Missing, Ok, Unreadable, Invalid };
+    enum class Read : std::uint8_t { Missing, Ok, Unreadable, Invalid };
     // Reads the file as it is now, newest plant first.
     Read read(std::vector<Plant> &plants) const;
     void load();

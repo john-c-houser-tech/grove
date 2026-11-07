@@ -7,7 +7,9 @@
 #include <QtConcurrent>
 #include <QtMath>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstring>
 #include <vector>
 
 #include "easing.h"
@@ -30,9 +32,9 @@ struct LowPass {
 // tune so the chord beats, with a quick start and a short release.
 void addBlast(std::vector<double> &out, int rate, double start, double seconds, double gain, double cutoff,
               double pass) {
-    static const double notes[3] = {311.1, 370.0, 466.2};
-    static const double detune[3] = {1.0, 1.004, 0.997};
-    double phase[3] = {0, 0, 0};
+    static constexpr std::array<double, 3> notes{311.1, 370.0, 466.2};
+    static constexpr std::array<double, 3> detune{1.0, 1.004, 0.997};
+    std::array<double, 3> phase{};
     LowPass lowpass(cutoff, rate);
     const int first = static_cast<int>(start * rate), count = static_cast<int>(seconds * rate);
     for (int i = 0; i < count && first + i < static_cast<int>(out.size()); ++i) {
@@ -51,8 +53,8 @@ void addBlast(std::vector<double> &out, int rate, double start, double seconds, 
 }
 
 // The standard grade-crossing signal: long, long, short, long.
-void addCrossingSignal(std::vector<double> &out, int rate, double start, double gain, double cutoff,
-                       double lastLong, double pass) {
+void addCrossingSignal(std::vector<double> &out, int rate, double start, double gain, double cutoff, double lastLong,
+                       double pass) {
     addBlast(out, rate, start + 0.0, 2.4, gain, cutoff, pass);
     addBlast(out, rate, start + 2.9, 2.4, gain, cutoff, pass);
     addBlast(out, rate, start + 5.8, 0.7, gain, cutoff, pass);
@@ -61,9 +63,9 @@ void addCrossingSignal(std::vector<double> &out, int rate, double start, double 
 
 // A crossing bell strike: a few inharmonic partials that die away.
 void addBell(std::vector<double> &out, int rate, double start, double gain, double pitch) {
-    static const double ratio[4] = {1.0, 1.54, 2.47, 3.35};
-    static const double level[4] = {1.0, 0.6, 0.35, 0.2};
-    static const double decay[4] = {0.3, 0.22, 0.16, 0.1};
+    static constexpr std::array<double, 4> ratio{1.0, 1.54, 2.47, 3.35};
+    static constexpr std::array<double, 4> level{1.0, 0.6, 0.35, 0.2};
+    static constexpr std::array<double, 4> decay{0.3, 0.22, 0.16, 0.1};
     const int first = static_cast<int>(start * rate), count = static_cast<int>(1.0 * rate);
     for (int i = 0; i < count && first + i < static_cast<int>(out.size()); ++i) {
         const double t = static_cast<double>(i) / rate;
@@ -76,18 +78,19 @@ void addBell(std::vector<double> &out, int rate, double start, double gain, doub
 
 QByteArray toPcm(std::vector<double> &out, double peakLevel) {
     double peak = 0;
-    for (double v : out)
+    for (const double v : out)
         peak = std::max(peak, qAbs(v));
-    QByteArray bytes(static_cast<qsizetype>(out.size() * 2), 0);
-    auto *samples = reinterpret_cast<qint16 *>(bytes.data());
-    for (size_t i = 0; i < out.size(); ++i)
-        samples[i] = static_cast<qint16>(out[i] / std::max(peak, 1e-9) * peakLevel * 32767);
+    QByteArray bytes(static_cast<qsizetype>(out.size() * sizeof(qint16)), 0);
+    for (size_t i = 0; i < out.size(); ++i) {
+        const auto sample = static_cast<qint16>(out[i] / std::max(peak, 1e-9) * peakLevel * 32767);
+        std::memcpy(bytes.data() + i * sizeof(qint16), &sample, sizeof(qint16));
+    }
     return bytes;
 }
 
 // Distance in a soft echo: sound off the hills a moment later.
 void addEcho(std::vector<double> &out, int rate, double delaySeconds, double feedback) {
-    const size_t delay = static_cast<size_t>(delaySeconds * rate);
+    const auto delay = static_cast<size_t>(delaySeconds * rate);
     for (size_t i = delay; i < out.size(); ++i)
         out[i] += feedback * out[i - delay];
 }
@@ -110,9 +113,10 @@ QByteArray Sounds::synthesizeTrain(int rate) {
         const double near = qExp(-qPow((t - pass) / 8.5, 2));
         out[i] += 5.0 * near * softer(slow(noise.generateDouble() * 2 - 1));
     }
-    for (double t = 2.0; t < kTrainSeconds - 2; t += 0.27) {
+    for (int k = 0; 2.0 + 0.27 * k < kTrainSeconds - 2; ++k) {
+        const double t = 2.0 + 0.27 * k;
         const double near = qExp(-qPow((t - pass) / 8.5, 2));
-        for (double offset : {0.0, 0.07}) {
+        for (const double offset : {0.0, 0.07}) {
             const int first = static_cast<int>((t + offset) * rate);
             LowPass tick(600, rate);
             for (int j = 0; j < rate / 20 && first + j < static_cast<int>(out.size()); ++j)
@@ -125,7 +129,8 @@ QByteArray Sounds::synthesizeTrain(int rate) {
     addCrossingSignal(out, rate, 16.0, 0.85, 1100, 3.0, pass);
 
     // Crossing bells start before the train is there and run until it is clear.
-    for (double t = 12.5; t < 34.0; t += 0.62) {
+    for (int k = 0; 12.5 + 0.62 * k < 34.0; ++k) {
+        const double t = 12.5 + 0.62 * k;
         const double level = 0.06 + 0.3 * qExp(-qPow((t - pass) / 7.0, 2));
         addBell(out, rate, t, level, 1450);
     }
@@ -207,14 +212,19 @@ QList<double> Sounds::eventTimes(QRandomGenerator &random, int count, double ses
 }
 
 Sounds::Sounds(bool persist, const QString &forcedKind, QObject *parent)
-    : QObject(parent), m_persist(persist), m_forced(forcedKind == "train" || forcedKind == "plane" ? forcedKind : QString()) {
+    : QObject(parent),
+      m_persist(persist),
+      m_forced(forcedKind == "train" || forcedKind == "plane" ? forcedKind : QString()) {
     m_fade.setInterval(30);
     connect(&m_fade, &QTimer::timeout, this, [this] {
-        const double volume = m_sink ? m_sink->volume() - m_fadeStep : 0;
+        if (m_sink == nullptr) {
+            m_fade.stop();
+            return;
+        }
+        const double volume = m_sink->volume() - m_fadeStep;
         if (volume <= 0.001) {
             m_fade.stop();
-            if (m_sink)
-                m_sink->stop();
+            m_sink->stop();
             return;
         }
         m_sink->setVolume(volume);
@@ -241,7 +251,7 @@ void Sounds::setMuted(bool muted) {
     m_muted = muted;
     if (m_persist)
         QSettings("grove", "grove").setValue("muted", muted);
-    if (muted && m_sink) {
+    if (muted && m_sink != nullptr) {
         m_fade.stop();
         m_sink->stop();
     }
@@ -285,7 +295,7 @@ void Sounds::begin(int sessionSeconds) {
     if (times.isEmpty())
         return;
     prepare(kind);
-    for (double seconds : times) {
+    for (const double seconds : times) {
         m_timers.emplace_back();
         QTimer &timer = m_timers.back();
         timer.setSingleShot(true);
@@ -301,7 +311,7 @@ void Sounds::end() {
     ++m_session;
     // A sound under way fades out over a second and a half rather than
     // stopping with a click, and what goes with it fades too.
-    if (m_sink && m_sink->state() == QAudio::ActiveState && !m_fade.isActive()) {
+    if (m_sink != nullptr && m_sink->state() == QAudio::ActiveState && !m_fade.isActive()) {
         m_fadeStep = m_sink->volume() / 50;
         m_fade.start();
     }
@@ -326,14 +336,14 @@ void Sounds::fire(const QString &kind) {
 void Sounds::showVisual(const QString &kind) {
     if (kind == "plane") {
         QRandomGenerator *random = QRandomGenerator::global();
-        emit planeFlyover(random->bounded(2) ? 1 : -1, planeMilliseconds(), random->generateDouble());
+        emit planeFlyover(random->bounded(2) == 1 ? 1 : -1, planeMilliseconds(), random->generateDouble());
     } else {
         emit trainPassing(trainMilliseconds());
     }
 }
 
 void Sounds::play(const QString &kind, int retries) {
-    if (m_sink && m_sink->state() == QAudio::ActiveState)
+    if (m_sink != nullptr && m_sink->state() == QAudio::ActiveState)
         return;
     // Muted while the sound was being made: the picture still goes.
     if (m_muted) {
@@ -341,7 +351,7 @@ void Sounds::play(const QString &kind, int retries) {
         return;
     }
     prepare(kind);
-    QFuture<QByteArray> &future = kind == "train" ? m_train : m_plane;
+    const QFuture<QByteArray> &future = kind == "train" ? m_train : m_plane;
     if (!future.isFinished()) {
         // Still being made; try again in a moment rather than miss it, unless
         // the session is over by then.
@@ -357,12 +367,12 @@ void Sounds::play(const QString &kind, int retries) {
     // The default output can change while Grove stays open: headphones, a
     // Bluetooth headset, a dock. A sink made for the old one is let go.
     const QAudioDevice device = QMediaDevices::defaultAudioOutput();
-    if (m_sink && device != m_sinkDevice) {
+    if (m_sink != nullptr && device != m_sinkDevice) {
         m_sink->stop();
         delete m_sink;
         m_sink = nullptr;
     }
-    if (!m_sink) {
+    if (m_sink == nullptr) {
         if (device.isNull()) {
             setProblem([] { return tr("No audio output found, so the distant sounds are silent."); });
             showVisual(kind);
@@ -373,7 +383,8 @@ void Sounds::play(const QString &kind, int retries) {
         format.setChannelCount(1);
         format.setSampleFormat(QAudioFormat::Int16);
         if (!device.isFormatSupported(format)) {
-            setProblem([] { return tr("The audio output cannot play 16-bit sound, so the distant sounds are silent."); });
+            setProblem(
+                [] { return tr("The audio output cannot play 16-bit sound, so the distant sounds are silent."); });
             showVisual(kind);
             return;
         }

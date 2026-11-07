@@ -36,13 +36,13 @@ class Hills : public PaintedLayer {
 
 public:
     struct Look {
-        double horizon;
+        double horizon = 0;
         QString part;
-        double snowline;
+        double snowline = 0;
         QColor farColor, midColor, nearColor, hazeColor, shadeColor, forestColor;
-        int shadowSide;
-        double relief;
-        double snowCover;
+        int shadowSide = 1;
+        double relief = 0;
+        double snowCover = 0;
         QColor snowColor;
     };
 

@@ -36,13 +36,14 @@ QVariant Garden::data(const QModelIndex &index, int role) const {
     case ProgressRole: return p.progress;
     case WhenRole: return p.when;
     case MinutesRole: return p.minutes;
+    default: break;
     }
     return {};
 }
 
 QHash<int, QByteArray> Garden::roleNames() const {
-    return {{SeedRole, "seed"}, {OutcomeRole, "outcome"}, {SeasonRole, "season"}, {WeatherRole, "weather"},
-            {ProgressRole, "progress"}, {WhenRole, "when"}, {MinutesRole, "minutes"}};
+    return {{SeedRole, "seed"},         {OutcomeRole, "outcome"}, {SeasonRole, "season"},  {WeatherRole, "weather"},
+            {ProgressRole, "progress"}, {WhenRole, "when"},       {MinutesRole, "minutes"}};
 }
 
 void Garden::setProblem(Problem::Words words) {
@@ -77,7 +78,7 @@ Garden::Read Garden::read(std::vector<Plant> &plants) const {
     // On disk the oldest plant comes first; the model wants newest first.
     plants.clear();
     const QJsonArray array = list.toArray();
-    for (const QJsonValue &value : array) {
+    for (const auto &value : array) {
         const QJsonObject o = value.toObject();
         Plant p;
         p.seed = o.value("seed").toInt(-1);
@@ -98,18 +99,18 @@ Garden::Read Garden::read(std::vector<Plant> &plants) const {
 void Garden::load() {
     std::vector<Plant> plants;
     switch (read(plants)) {
-    case Read::Missing:
-        return;
+    case Read::Missing: return;
     case Read::Unreadable:
         m_readOnly = true;
         setProblem([] { return tr("Could not open the garden file, so new plants will not be saved."); });
         return;
     case Read::Invalid:
         m_readOnly = true;
-        setProblem([] { return tr("The garden file could not be read. It was left untouched, and new plants will not be saved."); });
+        setProblem([] {
+            return tr("The garden file could not be read. It was left untouched, and new plants will not be saved.");
+        });
         return;
-    case Read::Ok:
-        break;
+    case Read::Ok: break;
     }
     beginResetModel();
     m_plants = std::move(plants);
@@ -173,17 +174,16 @@ void Garden::record(const Plant &plant) {
     }
     std::vector<Plant> plants;
     switch (read(plants)) {
-    case Read::Missing:
-        plants.clear();
-        break;
-    case Read::Ok:
-        break;
+    case Read::Missing: plants.clear(); break;
+    case Read::Ok: break;
     case Read::Unreadable:
     case Read::Invalid:
         // Changed into something that cannot be read since: leave it be.
         m_readOnly = true;
         keepUnsaved();
-        setProblem([] { return tr("The garden file could not be read. It was left untouched, and new plants will not be saved."); });
+        setProblem([] {
+            return tr("The garden file could not be read. It was left untouched, and new plants will not be saved.");
+        });
         return;
     }
     plants.insert(plants.begin(), plant);
