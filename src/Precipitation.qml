@@ -7,6 +7,8 @@ import QtQuick.Particles
 Item {
     id: root
 
+    // How much rain, fog and snow there is (Weather), and how much light
+    // (Light.ambient), each from 0 to 1.
     property real rain: 0
     property real fog: 0
     property real snow: 0
@@ -26,6 +28,7 @@ Item {
     // out nearly opaque. `c` must be a color, not a colour name, which has no
     // channels to scale.
     function premultiplied(c, alpha) { return Qt.rgba(c.r * alpha, c.g * alpha, c.b * alpha, 1) }
+    // The colours of rain, and of snow by day and in low light.
     readonly property color dropColor: "#b4cde0"
     readonly property color flakeColor: root.ambient > 0.5 ? "#ffffff" : "#c9d6ee"
 

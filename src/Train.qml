@@ -46,6 +46,7 @@ Item {
         { kind: "coach", length: 25, tall: 4.4 },
         { kind: "coach", length: 25, tall: 4.4 }
     ]
+    // The gap between vehicles, and the train's whole length, in metres.
     readonly property real coupling: 0.6
     readonly property real lengthMetres: 17 + 3 * 25 + 3 * coupling
     // The train's length as a fraction of the width, and a speed that gets

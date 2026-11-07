@@ -27,6 +27,7 @@ class TrackBed : public PaintedLayer {
     Q_PROPERTY(QColor hazeColor MEMBER m_hazeColor NOTIFY changed)
 
 public:
+    // Everything paint() draws from, copied whole to the drawing thread.
     struct Look {
         double horizon = 0, crossingX = 0;
         QColor floorColor, ballastColor, railColor, roadColor, cutColor, fillColor, hillColor, hazeColor;
@@ -36,9 +37,12 @@ public:
 
     // The track is straight and level across the valley, this far down.
     static double trackY(double horizon, double height) { return height * (horizon - 0.085); }
+    // Draws the valley floor and the railway at `width` by `height` pixels. It runs on the drawing
+    // thread, and tests call it directly.
     static void paint(QPainter &painter, const Look &look, double width, double height);
 
 signals:
+    // A property changed, and the layer is drawn again.
     void changed();
 
 protected:

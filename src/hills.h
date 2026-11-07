@@ -37,6 +37,7 @@ class Hills : public PaintedLayer {
     Q_PROPERTY(QColor snowColor MEMBER m_snowColor NOTIFY changed)
 
 public:
+    // Everything paint() draws from, copied whole to the drawing thread.
     struct Look {
         double horizon = 0;
         QString part;
@@ -50,9 +51,12 @@ public:
 
     explicit Hills(QQuickItem *parent = nullptr);
 
+    // Draws the hills at `width` by `height` pixels. It runs on the drawing
+    // thread, and tests call it directly.
     static void paint(QPainter &painter, const Look &look, double width, double height);
 
 signals:
+    // A property changed, and the layer is drawn again.
     void changed();
 
 protected:

@@ -5,6 +5,8 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 import Grove
 
+// The window: the scene, the timer and its hint, and the help, garden and
+// confirmation laid over it.
 ApplicationWindow {
     id: win
     width: 760
@@ -23,6 +25,8 @@ ApplicationWindow {
     Material.roundedScale: Theme.radius
     // qmllint enable incompatible-type
 
+    // Which overlay is open, and whether quitting mid-session was confirmed,
+    // so closing the window does not ask twice.
     property bool helpVisible: false
     property bool gardenVisible: false
     property bool quitConfirmed: false

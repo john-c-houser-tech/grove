@@ -51,7 +51,7 @@ Giving up or quitting mid-session asks first, because the plant wilts.
 
 On Arch or Omarchy: `bin/install` builds the package and installs it, and
 Grove then appears in the launcher (Super + Space). To just run it:
-`bin/build && build/grove`. `bin/test` runs the tests.
+`bin/build && build/grove`.
 
 It needs `qt6-base`, `qt6-declarative`, `qt6-multimedia` and `qt6-wayland`.
 
@@ -79,6 +79,16 @@ window, and does not save over it.
 | `GROVE_GARDEN=/path/garden.json` | Use another garden file. |
 | `GROVE_SOUND_TEST=train` | Make a `train` or a `plane` happen a few seconds into the next session, whatever the hour. |
 | `GROVE_SOUND_VOLUME=0.5` | Scale the volume from 0 to 1. |
+
+## Development
+
+`bin/test` runs the unit tests and the scene tests, which drive the whole app
+offscreen. `bin/lint` runs the static checks (formatting, compiler warnings,
+clang-tidy, qmllint, the translation catalogs) and `bin/check-leaks` the
+memory checks (AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer,
+and a soak test); `bin/check` runs everything. `CODING_STANDARDS.md` says how
+the code is written and checked, and `githooks/` holds a pre-commit hook
+(`git config core.hooksPath githooks`).
 
 ## License
 

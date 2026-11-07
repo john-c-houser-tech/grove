@@ -6,7 +6,10 @@ import QtQuick
 Canvas {
     id: cloud
 
+    // Picks the kind of cloud and every lump of it, so a seed is always the
+    // same cloud. Seeds 1, 4, 7... are stratus.
     property int seed: 1
+    // The lit colour of the cloud's top, and of its underside.
     property color tone: "white"
     property color shade: "gray"
 

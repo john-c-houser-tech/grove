@@ -24,13 +24,14 @@ public:
     // needs by value, since it runs on another thread.
     using Painting = std::function<void(QPainter &painter, double width, double height)>;
 
-    // Draws a painting as this class does, with the empty rows above and below
-    // trimmed. `top` is where the image starts, in pixels; the image is null if
-    // nothing was drawn.
+    // A drawn layer: its image, and where the image starts, in pixels from
+    // the top of the item. The image is null if nothing was drawn.
     struct Picture {
         QImage image;
         double top = 0;
     };
+    // Draws a painting as this class does, at the display's scale, with the
+    // empty rows above and below trimmed and nothing below `coveredFrom`.
     static Picture draw(const Painting &painting, const QSizeF &size, double coveredFrom, qreal devicePixelRatio);
 
 signals:

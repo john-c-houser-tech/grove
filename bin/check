@@ -1,0 +1,9 @@
+#!/bin/sh
+# Every check there is: the static checks, the tests, and the memory checks.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+"$ROOT/bin/lint"
+"$ROOT/bin/test"
+"$ROOT/bin/check-leaks"
+echo "all checks passed"

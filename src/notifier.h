@@ -19,9 +19,13 @@ public:
     // Empty when notifications work, otherwise why they cannot (shown in the window).
     QString problem() const { return m_problem.text(); }
 
+    // Tells the desktop the plant is fully grown. Asynchronous: a slow or
+    // missing notification service never holds up the window, and a missing
+    // one shows as a problem.
     void plantGrown();
 
 signals:
+    // The problem changed, or the language did and it reads differently.
     void problemChanged();
 
 private:

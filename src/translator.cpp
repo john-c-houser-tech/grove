@@ -23,7 +23,6 @@ Translator::Translator(const QString &languageFile, QString catalogDirectory, QO
     reload();
 }
 
-// One registry code on the first line; anything else, or no file, is English.
 QString Translator::readLanguage(const QString &path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
@@ -33,8 +32,6 @@ QString Translator::readLanguage(const QString &path) {
     return valid.match(code).hasMatch() ? code : "en";
 }
 
-// CLDR cardinal plural categories for whole counts, for Omarchy's languages
-// (the same rules as Omarchy's shell/Commons/Plural.js).
 QString Translator::pluralCategory(const QString &language, long long count) {
     const long long n = count < 0 ? -count : count, n10 = n % 10, n100 = n % 100;
     const bool millions = n != 0 && n % 1000000 == 0;
@@ -70,9 +67,6 @@ QString Translator::pluralCategory(const QString &language, long long count) {
     // clang-format on
 }
 
-// The locale Omarchy formats this language with, from its registry, so the
-// app's numbers and dates match the desktop's (Arabic there uses Western
-// digits); without Omarchy, Qt's own locale for the code.
 QLocale Translator::formatLocale(const QString &language) {
     QFile registry(qEnvironmentVariable("OMARCHY_PATH") + "/default/i18n/locales.json");
     if (registry.open(QIODevice::ReadOnly)) {

@@ -43,6 +43,7 @@ class Field : public PaintedLayer {
     Q_PROPERTY(double plantBaseY READ plantBaseY NOTIFY viewChanged)
 
 public:
+    // Everything paint() draws from, copied whole to the drawing thread.
     struct Look {
         double horizon = 0, groundTop = 0, vanishX = 0, plantX = 0;
         QString part;
@@ -60,9 +61,12 @@ public:
     double farEdgeY() const;
     double plantBaseY() const;
 
+    // Draws the field at `width` by `height` pixels. It runs on the drawing
+    // thread, and tests call it directly.
     static void paint(QPainter &painter, const Look &look, double width, double height);
 
 signals:
+    // A property changed, and the layer is drawn again.
     void changed();
     void viewChanged();
 

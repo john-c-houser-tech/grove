@@ -34,6 +34,8 @@ private:
 // last and destroyed first, so nothing in the window outlives what it shows.
 class App {
 public:
+    // How an App is set up: from the environment for the real app, and by
+    // hand for tests, which keep everything of the desktop's out of reach.
     struct Options {
         // How long a session lasts.
         int seconds = 25 * 60;
@@ -60,6 +62,7 @@ public:
     // GROVE_DATE (YYYY-MM-DD), GROVE_WEATHER, GROVE_SOUND_TEST and GROVE_GARDEN.
     static Options fromEnvironment();
 
+    // Makes and wires everything; the window comes with load().
     explicit App(const Options &options);
     ~App();
     App(const App &) = delete;

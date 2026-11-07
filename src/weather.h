@@ -19,6 +19,7 @@ class Weather : public QObject {
     Q_PROPERTY(double growth READ growth NOTIFY growthChanged)
 
 public:
+    // How much of each weather there is, each from 0 to 1.
     struct Conditions {
         double cloud = 0, rain = 0, fog = 0, snow = 0;
     };
@@ -30,7 +31,10 @@ public:
 
     // The dominant weather right now.
     QString kind() const;
+    // "spring", "summer", "autumn" or "winter", from the session's date.
     QString season() const { return m_season; }
+    // How much of each there is now, 0 to 1. They move from the session's
+    // first weather to its second between 30% and 70% of the way through.
     double cloud() const { return m_now.cloud; }
     double rain() const { return m_now.rain; }
     double snow() const { return m_now.snow; }
@@ -41,16 +45,23 @@ public:
 
     // Rolls the weather for a new session on `date`.
     void begin(int seed, const QDate &date);
+    // Moves the weather through the session, 0 to 1; App calls it as the
+    // session's progress changes.
     void setProgress(double progress);
 
+    // The amounts of a kind of weather once it has fully set in.
     static Conditions conditions(const QString &kind);
+    // The season of a date, by calendar month, in the northern hemisphere.
     static QString seasonOf(const QDate &date);
+    // Rolls a kind of weather by the season's weights.
     static QString pickKind(QRandomGenerator &random, const QString &season);
 
 signals:
-    // The sky (kind, season, cloud, rain, snow and fog), and the plant's
-    // growth, each on its own, so growing does not redraw the sky.
+    // The sky (kind, season, cloud, rain, snow and fog) has changed: only once
+    // it has moved enough to see, about 1% of any amount, and when it
+    // settles. Growing does not redraw the sky, so growth has its own signal.
     void changed();
+    // The plant's growth has changed, as often as the session's progress does.
     void growthChanged();
 
 private:

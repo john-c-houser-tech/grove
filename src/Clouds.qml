@@ -6,6 +6,8 @@ import QtQuick
 Item {
     id: root
 
+    // How much of the sky is cloud, how much rain darkens it, and how much
+    // light there is (Light.ambient), each from 0 to 1.
     property real cover: 0
     property real rain: 0
     property real ambient: 1
@@ -38,6 +40,7 @@ Item {
                        clamp01(level * 0.99 + cast * (sky.g - skyMean)),
                        clamp01(level + cast * (sky.b - skyMean)), 1)
     }
+    // The colour of a cloud's top in this light.
     readonly property color cloudColor: lit(shade)
     // The underside of a cloud is always a little darker, and bluer, than its top.
     readonly property color cloudShade: Qt.rgba(cloudColor.r * 0.66, cloudColor.g * 0.71, cloudColor.b * 0.8, 1)

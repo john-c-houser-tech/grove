@@ -20,6 +20,9 @@ class Translator : public QTranslator {
     Q_PROPERTY(bool rightToLeft READ rightToLeft NOTIFY changed)
 
 public:
+    // `languageFile` is where Omarchy keeps the language code (empty for
+    // ~/.config/omarchy/language), watched for changes; `catalogDirectory`
+    // holds the catalogs. Tests pass files of their own.
     explicit Translator(const QString &languageFile = {}, QString catalogDirectory = ":/i18n",
                         QObject *parent = nullptr);
 
@@ -31,11 +34,20 @@ public:
     QString translate(const char *context, const char *sourceText, const char *disambiguation = nullptr,
                       int n = -1) const override;
 
+    // The registry code on the first line of the language file; anything
+    // else, or no file, is English.
     static QString readLanguage(const QString &path);
+    // The CLDR plural category ("one", "few", "other"...) of a whole count in
+    // a language, by the same rules as Omarchy's shell/Commons/Plural.js.
     static QString pluralCategory(const QString &language, long long count);
+    // The locale Omarchy formats the language with, from its registry, so
+    // numbers and dates match the desktop's (Arabic there uses Western
+    // digits); without Omarchy, Qt's own locale for the code.
     static QLocale formatLocale(const QString &language);
 
 signals:
+    // The language changed; QML retranslates, and problems reported from C++
+    // are asked for again (see problem.h).
     void changed();
 
 private:

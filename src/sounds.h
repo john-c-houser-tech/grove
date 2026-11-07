@@ -32,6 +32,8 @@ public:
     explicit Sounds(bool persist = true, const QString &forcedKind = {}, QObject *parent = nullptr);
     ~Sounds() override;
 
+    // Muting silences the sounds but keeps the train and plane in the
+    // picture; the choice is remembered when `persist` is set.
     bool muted() const { return m_muted; }
     void setMuted(bool muted);
     // Empty when sound works, otherwise why it cannot (shown in the window).
@@ -48,9 +50,11 @@ public:
     void begin(int sessionSeconds);
     void end();
 
-    // One phrase of each sound as 16-bit mono PCM.
+    // One phrase of each sound as 16-bit mono PCM. They take a moment, so
+    // Sounds makes them on another thread well before they are due.
     static QByteArray synthesizeTrain(int sampleRate = 44100);
     static QByteArray synthesizePlane(int sampleRate = 44100);
+    // How long each phrase lasts, which is how long its picture lasts too.
     static int trainMilliseconds();
     static int planeMilliseconds();
     // How many times a sound happens in one session: a train 1 to 3 times, a
@@ -62,6 +66,7 @@ public:
 
 signals:
     void mutedChanged();
+    // The problem changed, or the language did and it reads differently.
     void problemChanged();
     // A plane crosses the sky: direction is 1 for left to right and -1 for the
     // other way, and altitude from 0 to 1 is how high it flies.

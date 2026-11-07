@@ -5,9 +5,12 @@ import QtQuick
 Canvas {
     id: plant
 
+    // How much of the plant exists, from 0 to 1, and which plant it is.
     property double progress: 0
     property int seed: 1
+    // A wilted plant droops and browns where it stopped.
     property bool wilted: false
+    // The blossoms, in the desktop accent.
     property color flowerColor: "#FFD60A"
     // Where the trunk meets the ground, as a fraction of the height.
     property real base: 0.88

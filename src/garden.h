@@ -18,13 +18,17 @@ class Garden : public QAbstractListModel {
     Q_PROPERTY(QString problem READ problem NOTIFY problemChanged)
 
 public:
+    // One plant as the garden keeps it.
     struct Plant {
+        // Grows the same plant again (see GrowingPlant.qml).
         int seed = 1;
         // "done" or "wilted".
         QString outcome;
+        // The season and the weather it grew in, as Weather names them.
         QString season, weather;
         // How much of the plant had grown, as the window showed it.
         double progress = 0;
+        // When the session ended, and how long it was if the plant grew to the end.
         QDateTime when;
         int minutes = 0;
     };
@@ -47,6 +51,7 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
+    // How many plants grew to the end, and how many wilted.
     int grown() const { return m_grown; }
     int wilted() const { return m_wilted; }
     // Time spent on plants that grew to the end; a wilted plant earns none.
@@ -54,12 +59,19 @@ public:
     // Empty when the garden is fine, otherwise why it cannot be read or saved.
     QString problem() const { return m_problem.text(); }
 
+    // Adds a plant and saves the garden. Another Grove may be open on the same
+    // file, so this re-reads it under a lock first and keeps the plants it
+    // saved. A file that cannot be read is not saved over, and the plant is
+    // still shown; problem() says why it was not kept.
     void record(const Plant &plant);
 
+    // ~/.local/share/grove/garden.json, or the platform's equivalent.
     static QString defaultPath();
 
 signals:
+    // grown, wilted or focusedMinutes changed.
     void countsChanged();
+    // The problem changed, or the language did and it reads differently.
     void problemChanged();
 
 private:

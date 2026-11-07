@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs the static checks and the tests before every commit; the memory checks
+# (bin/check-leaks) take longer and are run by hand, as CODING_STANDARDS.md
+# says. Enable with: git config core.hooksPath githooks
+set -eu
+
+ROOT="$(git rev-parse --show-toplevel)"
+"$ROOT/bin/lint"
+"$ROOT/bin/test" >/dev/null
+echo "pre-commit: lint and tests passed"

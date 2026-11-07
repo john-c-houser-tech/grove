@@ -24,12 +24,17 @@ public:
 
     // "idle", "growing", "done" or "wilted".
     QString state() const { return m_state; }
+    // How far through the session, from 0 to 1.
     double progress() const { return m_progress; }
+    // Whole seconds left, rounded up, so the countdown never shows 0 early.
     int remaining() const;
+    // The session's full length.
     int minutes() const { return m_seconds / 60; }
     int seconds() const { return m_seconds; }
+    // The plant's seed, new each session, so no two plants are alike.
     int seed() const { return m_seed; }
 
+    // Starts a session, unless one is already growing.
     Q_INVOKABLE void start();
     // Giving up early leaves a wilted plant behind.
     Q_INVOKABLE void giveUp();
@@ -37,7 +42,10 @@ public:
     void advance(qint64 milliseconds);
 
 signals:
+    // A session started, finished or was given up.
     void stateChanged();
+    // The countdown moved on a second, or the plant grew enough to show
+    // (0.2% of a session); not on every tick, which no one could see.
     void progressChanged();
 
 private:

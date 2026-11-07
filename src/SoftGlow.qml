@@ -5,6 +5,7 @@ import QtQuick
 Canvas {
     id: glow
 
+    // The light's colour, and its brightness at the centre, from 0 to 1.
     property color color: "white"
     property real strength: 1
 

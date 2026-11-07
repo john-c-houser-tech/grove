@@ -7,7 +7,6 @@ import Grove
 Item {
     id: root
 
-    property real flightHeight: 0.88
     // How far through the flight it is, from 0 to 1.
     property real progress: 0
     property int direction: 1
@@ -15,6 +14,7 @@ Item {
     property color bodyColor: "#2b3644"
     property bool flying: false
 
+    // The wingspan on screen, in pixels: small and far off.
     readonly property real span: Math.min(width, height) * 0.05
     visible: flying
     // 1 through a flight. When the session ends mid-flight it eases to 0 and
