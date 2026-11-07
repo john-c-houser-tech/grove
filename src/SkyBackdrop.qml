@@ -124,8 +124,14 @@ Item {
                                           weatherTint), light.nightTint), light.warmTint)
         }
         // Winter snow reaches low; by summer only the highest peaks keep any.
-        readonly property real snowline: weather.season === "winter" ? 0.4 : weather.season === "spring" ? 0.52
-                                       : weather.season === "autumn" ? 0.56 : 0.66
+        readonly property real snowline: weather.season === "winter" ? 0.45 : 0.6
+        // Bare granite with a few high patches most of the year; a white range
+        // in winter, and plenty left in spring.
+        readonly property real snowCover: weather.season === "winter" ? 1 : weather.season === "spring" ? 0.65
+                                        : weather.season === "autumn" ? 0.3 : 0.15
+        readonly property color rockColor: Qt.tint(lit("#8c97a3", 0.3), Qt.rgba(0.02, 0.03, 0.06, 0.5 * dark))
+        readonly property color rockShade: Qt.tint(lit("#4a5668", 0.22), Qt.rgba(0.02, 0.03, 0.06, 0.5 * dark))
+        readonly property color forestColor: Qt.tint(lit("#2c3d33", 0.3), Qt.rgba(0.02, 0.03, 0.06, 0.5 * dark))
         // After dark the land goes to silhouette against the sky, so the far
         // peaks keep an edge even when cloud washes the sky toward their colour.
         readonly property real dark: 1 - light.ambient
@@ -146,8 +152,15 @@ Item {
         anchors.fill: parent
         horizon: root.horizon
         snowline: look.snowline
+        snowCover: look.snowCover
         hazeColor: light.skyBottom
-        farColor: look.farColor
+        farColor: look.rockColor
+        shadeColor: look.rockShade
+        forestColor: look.forestColor
+        // The faces away from the sun are in shadow, strongly in clear sun,
+        // hardly at all under cloud or at night.
+        shadowSide: light.sunX < 0.5 ? 1 : -1
+        relief: light.sunUp ? 0.7 * Math.min(1, light.ambient) * (1 - 0.85 * weather.cloud) * (1 - weather.fog) : 0.08
         midColor: look.midColor
         nearColor: look.nearColor
         snowColor: look.snowColor

@@ -19,6 +19,17 @@ Canvas {
     property color midColor: "#46605a"
     property color nearColor: "#30493b"
     property color hazeColor: "#9fb7c4"
+    // The far range is bare granite: lit rock, rock in shadow, and forest along
+    // its foot. Which side of each peak is in shadow follows the sun (1 when
+    // the right-hand faces are shaded), and relief is how strong the shadows
+    // are, from 0 under cloud or at night to about 0.7 in clear sun.
+    property color shadeColor: "#4d5a6c"
+    property color forestColor: "#2f3e35"
+    property int shadowSide: 1
+    property real relief: 0.5
+    // How much snow the range carries, from a few high patches (0) to fully
+    // white (1).
+    property real snowCover: 0.3
     property color snowColor: "#f2f6fa"
 
     onFarColorChanged: requestPaint()
@@ -26,6 +37,11 @@ Canvas {
     onNearColorChanged: requestPaint()
     onHazeColorChanged: requestPaint()
     onSnowColorChanged: requestPaint()
+    onSnowCoverChanged: requestPaint()
+    onReliefChanged: requestPaint()
+    onShadowSideChanged: requestPaint()
+    onForestColorChanged: requestPaint()
+    onShadeColorChanged: requestPaint()
     onSnowlineChanged: requestPaint()
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
@@ -51,25 +67,33 @@ Canvas {
 
     // Height of each layer's ridge above the horizon, in pixels, at fraction u
     // of the way across.
-    // The far range, after the Tetons: no foothills, a wall of steep pointed
-    // peaks rising straight from the valley, tallest in a cluster just right of
-    // the middle and lower, still jagged, out to both edges. Each peak is its
-    // middle, its top (fraction of the height above the horizon), and how
-    // steeply it falls away on the left and on the right.
+    // The far range, after the Tetons: no foothills, a wall of blunt, blocky
+    // granite summits rising straight from the valley on one broad mass that
+    // is highest in the middle, the tallest summit just left of centre. Each
+    // peak is its middle, its top (fraction of the height above the horizon),
+    // and how steeply it falls away on the left and on the right.
     readonly property var peaks: [
-        [0.02, 0.225, 1.1, 1.2], [0.17, 0.245, 1.0, 1.3], [0.31, 0.27, 1.2, 1.4],
-        [0.455, 0.33, 1.5, 1.3], [0.56, 0.29, 1.3, 1.1], [0.71, 0.25, 1.1, 1.2],
-        [0.85, 0.24, 1.0, 1.2], [0.99, 0.225, 1.1, 1.0]
+        [0.0, 0.25, 1.3, 1.4], [0.17, 0.27, 1.4, 1.5], [0.32, 0.29, 1.5, 1.4],
+        [0.465, 0.335, 1.6, 1.7], [0.585, 0.305, 1.5, 1.5], [0.71, 0.285, 1.4, 1.3],
+        [0.85, 0.265, 1.3, 1.5], [1.0, 0.25, 1.4, 1.3]
     ]
+    function peakHeight(p, u) {
+        // A rounded, blunt summit that steepens into straight flanks.
+        var d = u - p[0], r = 0.03
+        return p[1] - (d < 0 ? p[2] : p[3]) * (Math.sqrt(d * d + r * r) - r)
+    }
     function far(u, H) {
-        var h = 0.15
+        var centre = (u - 0.5) / 0.32
+        var h = 0.19 + 0.05 * Math.exp(-centre * centre)
         for (var i = 0; i < peaks.length; i++) {
             var p = peaks[i]
-            var fall = u < p[0] ? (p[0] - u) * p[2] : (u - p[0]) * p[3]
-            h = Math.max(h, p[1] - fall)
+            h = Math.max(h, peakHeight(p, u))
+            // Lesser tops on each flank: granite massifs are never one clean
+            // pyramid.
+            h = Math.max(h, peakHeight([p[0] - 0.048, p[1] - 0.038, 2.2, 2.4], u))
+            h = Math.max(h, peakHeight([p[0] + 0.052, p[1] - 0.045, 2.4, 2.2], u))
         }
-        // A serrated skyline: granite breaks into teeth and notches.
-        h += 0.005 * (ridged(u * 30 + 7, 9) - 0.45) + 0.0025 * (noise(u * 80, 10) - 0.5)
+        h += 0.004 * (ridged(u * 30 + 7, 9) - 0.45) + 0.002 * (noise(u * 80, 10) - 0.5)
         return H * h
     }
     function mid(u, H) {
@@ -121,8 +145,9 @@ Canvas {
             return
         }
 
-        // Far peaks, with snow above a ragged snowline.
-        paintRidge(ctx, far, H * 0.34, 0, farColor, 0.55)
+        // The far range: rock, hazier toward its foot.
+        paintRidge(ctx, far, H * 0.34, 0, farColor, 0.45)
+        var snowY = y0 - H * 0.34 * snowline
         ctx.save()
         ctx.beginPath()
         ctx.moveTo(0, H)
@@ -131,54 +156,143 @@ Canvas {
         ctx.lineTo(W, H)
         ctx.closePath()
         ctx.clip()
-        var snowY = y0 - H * 0.34 * snowline
-        ctx.beginPath()
-        ctx.moveTo(0, 0)
-        ctx.lineTo(W, 0)
-        for (var sx = W; sx >= 0; sx -= 4) {
-            // The snowline wanders with the rock, so caps have jagged feet.
-            var u = sx / W
-            // Each face holds its snow differently: some low, some high.
-            var wobble = H * (0.06 * (noise(u * 7, 7) - 0.5) + 0.03 * (noise(u * 23, 13) - 0.5) + 0.012 * (noise(u * 60, 8) - 0.5))
-            ctx.lineTo(sx, snowY + wobble)
+
+        // Snow. In a snowy season it caps the range above a ragged snowline,
+        // whitest on the summits where it is coldest.
+        if (snowCover >= 0.5) {
+            ctx.beginPath()
+            ctx.moveTo(0, 0)
+            ctx.lineTo(W, 0)
+            for (var sx = W; sx >= 0; sx -= 4) {
+                var u = sx / W
+                // Each face holds its snow differently: some low, some high.
+                var wobble = H * (0.06 * (noise(u * 7, 7) - 0.5) + 0.03 * (noise(u * 23, 13) - 0.5) + 0.012 * (noise(u * 60, 8) - 0.5))
+                ctx.lineTo(sx, snowY + wobble)
+            }
+            ctx.closePath()
+            var cap = ctx.createLinearGradient(0, y0 - H * 0.33, 0, snowY + H * 0.02)
+            cap.addColorStop(0, snowColor)
+            cap.addColorStop(0.45, mix(snowColor, farColor, 0.2))
+            cap.addColorStop(1, mix(snowColor, farColor, 0.6))
+            ctx.fillStyle = cap
+            ctx.fill()
         }
-        ctx.closePath()
-        // It is colder the higher you go, so the snow is whitest on the summits
-        // and greyer, thinner, toward its lower edge.
-        var cap = ctx.createLinearGradient(0, y0 - H * 0.33, 0, snowY + H * 0.02)
-        cap.addColorStop(0, snowColor)
-        cap.addColorStop(0.45, mix(snowColor, farColor, 0.2))
-        cap.addColorStop(1, mix(snowColor, farColor, 0.6))
-        ctx.fillStyle = cap
-        ctx.fill()
-        // Below the snowfields, snow runs on down the steep gullies that score
-        // the faces: long thin streaks leaving the snow, angling down the face
-        // and thinning out to nothing.
-        for (var pk = 0; pk < peaks.length; pk++) {
-            var peak = peaks[pk]
-            if (peak[1] < 0.28)
-                continue
-            for (var g = 0; g < 2; g++) {
-                var side = g === 1 ? 1 : -1
-                var slope = side < 0 ? peak[2] : peak[3]
-                var gu = peak[0] + side * (0.006 + 0.016 * noise(pk * 2.1 + g * 5, 11))
-                var gx = W * gu
-                // Start inside the snow, a little above where it ends here.
-                var gtop = Math.max(y0 - far(gu, H) + H * 0.01, snowY - H * 0.02)
-                var len = H * (0.03 + 0.03 * noise(pk * 3.3 + g, 12))
-                var drift = side * len * (0.18 + 0.25 / slope)
-                var streak = ctx.createLinearGradient(0, gtop, 0, gtop + len)
-                streak.addColorStop(0, Qt.rgba(snowColor.r, snowColor.g, snowColor.b, 0.65))
-                streak.addColorStop(1, Qt.rgba(snowColor.r, snowColor.g, snowColor.b, 0))
-                ctx.fillStyle = streak
-                var half = H * 0.0018
+        // Each summit has a face toward the sun and a face away from it,
+        // divided along a spur running down from the top. The shaded face runs
+        // from that spur round to the next notch along the skyline.
+        if (relief > 0.01) {
+            ctx.fillStyle = Qt.rgba(shadeColor.r, shadeColor.g, shadeColor.b, relief)
+            for (var pk = 0; pk < peaks.length; pk++) {
+                var peak = peaks[pk]
+                var side = shadowSide
+                var su = peak[0]
+                // Along the skyline to the low point before the next peak.
+                var eu = su, prevH = far(su, H)
+                for (var k = 0; k < 60; k++) {
+                    var nu = eu + side * 0.003
+                    var nh = far(nu, H)
+                    if (nh > prevH + 0.5 && k > 4)
+                        break
+                    eu = nu
+                    prevH = nh
+                }
+                var top = y0 - far(su, H)
+                var footU = su + side * (0.03 + 0.015 * noise(pk * 1.7, 14))
                 ctx.beginPath()
-                ctx.moveTo(gx - half, gtop)
-                ctx.lineTo(gx + half, gtop)
-                ctx.quadraticCurveTo(gx + drift * 0.4 + half * 0.5, gtop + len * 0.5, gx + drift, gtop + len)
-                ctx.quadraticCurveTo(gx + drift * 0.4 - half * 0.5, gtop + len * 0.5, gx - half, gtop)
+                ctx.moveTo(W * su, top)
+                for (var wu = su; side > 0 ? wu <= eu : wu >= eu; wu += side * 0.003)
+                    ctx.lineTo(W * wu, y0 - far(wu, H))
+                // From the notch down a diagonal to the foot of the spur, then
+                // back up the spur, a little bowed, to the summit.
+                ctx.lineTo(W * footU, y0 - H * 0.1)
+                ctx.quadraticCurveTo(W * (su + side * 0.006), top + H * 0.06, W * su, top)
                 ctx.closePath()
                 ctx.fill()
+                // Buttresses break up the sunlit face: narrow ribs whose sides
+                // away from the sun fall into shade.
+                ctx.fillStyle = Qt.rgba(shadeColor.r, shadeColor.g, shadeColor.b, relief * 0.45)
+                for (var rb = 0; rb < 2; rb++) {
+                    var ru = su - side * (0.022 + 0.026 * rb + 0.008 * noise(pk * 3.1 + rb, 19))
+                    var rtop = y0 - far(ru, H) + H * 0.004
+                    var rwide = 0.008 + 0.006 * noise(pk + rb * 5, 20)
+                    ctx.beginPath()
+                    ctx.moveTo(W * ru, rtop)
+                    ctx.lineTo(W * (ru + side * rwide), y0 - far(ru + side * rwide, H) + H * 0.006)
+                    // Ribs fan out from the summit as they come down.
+                    var spread = 0.035 + 0.02 * rb
+                    ctx.lineTo(W * (ru - side * spread + side * 0.01), y0 - H * 0.13)
+                    ctx.lineTo(W * (ru - side * spread), y0 - H * 0.13)
+                    ctx.closePath()
+                    ctx.fill()
+                }
+                ctx.fillStyle = Qt.rgba(shadeColor.r, shadeColor.g, shadeColor.b, relief)
+            }
+        }
+
+        // Forest along the foot of the range, its top edge ragged with trees.
+        ctx.fillStyle = forestColor
+        ctx.beginPath()
+        ctx.moveTo(0, H)
+        for (var fx = 0; fx <= W; fx += 3) {
+            var fu = fx / W
+            var line = 0.14 + 0.022 * noise(fu * 9, 16) + 0.01 * noise(fu * 31, 17)
+            var tips = 0.006 * (hash(Math.floor(fx / 3), 18) - 0.5)
+            ctx.lineTo(fx, y0 - H * (line + tips))
+        }
+        ctx.lineTo(W, H)
+        ctx.closePath()
+        ctx.fill()
+
+        // Whatever the season, snow lies in the gullies high on the faces,
+        // mostly on the side out of the sun: thin, ragged streaks down the
+        // fall line, with a few patches beside them. Short and few in summer,
+        // long and many in winter.
+        for (var pp = 0; pp < peaks.length; pp++) {
+            var pkk = peaks[pp]
+            var gullies = 1 + Math.round(2 * snowCover)
+            for (var n = 0; n < gullies + 1; n++) {
+                var seed = pp * 31 + n
+                // The last one, if any, is on the sunlit face.
+                var pside = n < gullies ? shadowSide : -shadowSide
+                if (n === gullies && hash(seed, 26) > 0.5 + snowCover * 0.5)
+                    continue
+                var pu = pkk[0] + pside * (0.008 + 0.035 * hash(seed, 22))
+                var ridgeAt = far(pu, H) / H
+                if (ridgeAt < 0.22)
+                    continue
+                var onShade = pside === shadowSide
+                var white = mix(snowColor, shadeColor, onShade ? 0.3 * relief : 0)
+                ctx.fillStyle = Qt.rgba(white.r, white.g, white.b, 0.85)
+                var gx = W * pu
+                var gy = y0 - H * ridgeAt + H * 0.006
+                var len = H * (0.018 + 0.03 * hash(seed, 24)) * (0.5 + snowCover)
+                var drift = pside * len * 0.35
+                // A ragged streak: its edges wander as it runs down.
+                var steps = 6
+                ctx.beginPath()
+                ctx.moveTo(gx, gy)
+                for (var st = 1; st <= steps; st++) {
+                    var t = st / steps
+                    var wide = H * 0.0035 * (1 - t * 0.7) * (0.6 + 0.8 * hash(seed, 50 + st))
+                    ctx.lineTo(gx + drift * t + wide, gy + len * t)
+                }
+                for (var sb = steps; sb >= 1; sb--) {
+                    var tb = sb / steps
+                    var wb = H * 0.0035 * (1 - tb * 0.7) * (0.6 + 0.8 * hash(seed, 60 + sb))
+                    ctx.lineTo(gx + drift * tb - wb, gy + len * tb)
+                }
+                ctx.closePath()
+                ctx.fill()
+                // Patches lying beside the gully.
+                for (var pb = 0; pb < 2; pb++) {
+                    var bt = 0.2 + 0.5 * hash(seed, 70 + pb)
+                    var bx = gx + drift * bt + pside * H * (0.006 + 0.006 * hash(seed, 72 + pb)) * (pb === 0 ? 1 : -1)
+                    var by = gy + len * bt
+                    var bsize = H * (0.002 + 0.003 * hash(seed, 74 + pb)) * (0.6 + snowCover)
+                    ctx.beginPath()
+                    ctx.ellipse(bx - bsize, by - bsize * 0.6, bsize * 2, bsize * 1.2)
+                    ctx.fill()
+                }
             }
         }
         ctx.restore()

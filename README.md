@@ -1,6 +1,6 @@
 # Grove
 
-![Grove growing an autumn plant under soft clouds](docs/grove.png)
+![Grove growing an autumn plant below the mountains](docs/grove.png)
 
 A focus timer that grows a plant while you work. Press Space to plant a seed
 in a furrow of the ploughed field.
