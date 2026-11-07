@@ -346,79 +346,6 @@ Item {
         }
     }
 
-    // The level crossing, to the same scale as the train: a post with a
-    // crossbuck, and two red lamps on an arm that flash in turn while the
-    // bells ring and are dark otherwise.
-    Item {
-        id: signal
-        readonly property bool ringing: root.running && root.seconds >= 12.5 && root.seconds <= 34
-        readonly property bool first: Math.floor((root.seconds - 12.5) / 0.62) % 2 === 0
-        readonly property real m: root.metre * root.sizeAt(root.crossingX)
-        x: root.width * root.crossingX
-        y: root.trackY(root.crossingX)
-
-        Rectangle {
-            x: -width / 2
-            y: -4.6 * signal.m
-            width: Math.max(1, 0.2 * signal.m)
-            height: 4.6 * signal.m
-            color: root.carColor
-        }
-        // The crossbuck: two boards crossed near the top of the post.
-        Repeater {
-            model: 2
-            delegate: Rectangle {
-                x: -width / 2
-                y: -4.15 * signal.m - height / 2
-                width: 2.7 * signal.m
-                height: Math.max(1, 0.24 * signal.m)
-                rotation: index === 0 ? 35 : -35
-                color: root.carColor
-            }
-        }
-        // The arm the lamps hang from.
-        Rectangle {
-            x: -width / 2
-            y: -3.0 * signal.m
-            width: 1.7 * signal.m
-            height: Math.max(1, 0.16 * signal.m)
-            color: root.carColor
-        }
-        Repeater {
-            model: 2
-            delegate: Item {
-                readonly property bool lit: signal.ringing && (index === 0) === signal.first
-                x: (index === 0 ? -0.62 : 0.62) * signal.m
-                y: -2.7 * signal.m
-                SoftGlow {
-                    x: -width / 2
-                    y: -height / 2
-                    width: 3.4 * signal.m
-                    height: width
-                    color: "#ff3b2a"
-                    opacity: lit ? 0.95 * root.fade : 0
-                }
-                // The lamp's black backing, and the lens on it.
-                Rectangle {
-                    x: -width / 2
-                    y: -height / 2
-                    width: Math.max(2, 0.6 * signal.m)
-                    height: width
-                    radius: width / 2
-                    color: root.carColor
-                }
-                Rectangle {
-                    x: -width / 2
-                    y: -height / 2
-                    width: Math.max(1.5, 0.34 * signal.m)
-                    height: width
-                    radius: width / 2
-                    color: lit ? "#ff6a55" : Qt.lighter(root.carColor, 1.6)
-                }
-            }
-        }
-    }
-
     // The train. Each vehicle is drawn once at full size, in metres, and only
     // moved and scaled as it runs.
     Repeater {
@@ -569,6 +496,81 @@ Item {
             y: lamps.rail - 1.4 * lamps.m - height / 2
             color: "#fff1cc"
             opacity: on ? 0.9 : 0.15
+        }
+    }
+
+    // The level crossing, to the same scale as the train: a post with a
+    // crossbuck, and two red lamps on an arm that flash in turn while the
+    // bells ring and are dark otherwise.
+    Item {
+        id: signal
+        readonly property bool ringing: root.running && root.seconds >= 12.5 && root.seconds <= 34
+        readonly property bool first: Math.floor((root.seconds - 12.5) / 0.62) % 2 === 0
+        readonly property real m: root.metre * root.sizeAt(root.crossingX)
+        x: root.width * root.crossingX
+        // On the near verge, just this side of the rails, so the train passes
+        // behind it. It is drawn after the train for the same reason.
+        y: root.trackY(root.crossingX) + root.height * 0.004
+
+        Rectangle {
+            x: -width / 2
+            y: -4.6 * signal.m
+            width: Math.max(1, 0.2 * signal.m)
+            height: 4.6 * signal.m
+            color: root.carColor
+        }
+        // The crossbuck: two boards crossed near the top of the post.
+        Repeater {
+            model: 2
+            delegate: Rectangle {
+                x: -width / 2
+                y: -4.15 * signal.m - height / 2
+                width: 2.7 * signal.m
+                height: Math.max(1, 0.24 * signal.m)
+                rotation: index === 0 ? 35 : -35
+                color: root.carColor
+            }
+        }
+        // The arm the lamps hang from.
+        Rectangle {
+            x: -width / 2
+            y: -3.0 * signal.m
+            width: 1.7 * signal.m
+            height: Math.max(1, 0.16 * signal.m)
+            color: root.carColor
+        }
+        Repeater {
+            model: 2
+            delegate: Item {
+                readonly property bool lit: signal.ringing && (index === 0) === signal.first
+                x: (index === 0 ? -0.62 : 0.62) * signal.m
+                y: -2.7 * signal.m
+                SoftGlow {
+                    x: -width / 2
+                    y: -height / 2
+                    width: 3.4 * signal.m
+                    height: width
+                    color: "#ff3b2a"
+                    opacity: lit ? 0.95 * root.fade : 0
+                }
+                // The lamp's black backing, and the lens on it.
+                Rectangle {
+                    x: -width / 2
+                    y: -height / 2
+                    width: Math.max(2, 0.6 * signal.m)
+                    height: width
+                    radius: width / 2
+                    color: root.carColor
+                }
+                Rectangle {
+                    x: -width / 2
+                    y: -height / 2
+                    width: Math.max(1.5, 0.34 * signal.m)
+                    height: width
+                    radius: width / 2
+                    color: lit ? "#ff6a55" : Qt.lighter(root.carColor, 1.6)
+                }
+            }
         }
     }
 }
