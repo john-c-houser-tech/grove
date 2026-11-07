@@ -57,29 +57,31 @@ Canvas {
     // middle, its top (fraction of the height above the horizon), and how
     // steeply it falls away on the left and on the right.
     readonly property var peaks: [
-        [0.0, 0.215, 1.6, 1.8], [0.08, 0.235, 1.5, 2.0], [0.16, 0.222, 1.8, 1.6],
-        [0.24, 0.25, 1.6, 2.1], [0.32, 0.265, 1.9, 1.7], [0.39, 0.285, 2.0, 2.4],
-        [0.455, 0.335, 2.6, 2.2], [0.515, 0.302, 2.3, 1.9], [0.57, 0.287, 2.1, 1.8],
-        [0.64, 0.255, 1.7, 1.9], [0.72, 0.242, 1.6, 1.7], [0.8, 0.228, 1.7, 1.5],
-        [0.88, 0.24, 1.5, 1.9], [0.96, 0.222, 1.8, 1.6], [1.03, 0.21, 1.6, 1.6]
+        [0.02, 0.225, 1.1, 1.2], [0.17, 0.245, 1.0, 1.3], [0.31, 0.27, 1.2, 1.4],
+        [0.455, 0.33, 1.5, 1.3], [0.56, 0.29, 1.3, 1.1], [0.71, 0.25, 1.1, 1.2],
+        [0.85, 0.24, 1.0, 1.2], [0.99, 0.225, 1.1, 1.0]
     ]
     function far(u, H) {
-        var h = 0.13
+        var h = 0.15
         for (var i = 0; i < peaks.length; i++) {
             var p = peaks[i]
             var fall = u < p[0] ? (p[0] - u) * p[2] : (u - p[0]) * p[3]
             h = Math.max(h, p[1] - fall)
         }
         // A serrated skyline: granite breaks into teeth and notches.
-        h += 0.011 * (ridged(u * 38 + 7, 9) - 0.45) + 0.005 * (noise(u * 95, 10) - 0.5)
+        h += 0.005 * (ridged(u * 30 + 7, 9) - 0.45) + 0.0025 * (noise(u * 80, 10) - 0.5)
         return H * h
     }
     function mid(u, H) {
         // A shoulder of hill rises behind the level crossing, so the road
-        // beyond the rails has a slope to climb into.
+        // beyond the rails has a slope to climb into, and a saddle dips in the
+        // ridge to the left of it: the pass the road goes over.
         var shoulder = (u - 0.6) / 0.12
+        var pass = (u - 0.25) / 0.04
+        var west = (u - 0.14) / 0.07
         return H * (0.035 + 0.15 * noise(u * 2.6 + 5, 4)) + H * 0.025 * noise(u * 8.2, 5)
-               + H * 0.07 * Math.exp(-shoulder * shoulder)
+               + H * 0.07 * Math.exp(-shoulder * shoulder) - H * 0.04 * Math.exp(-pass * pass)
+               + H * 0.03 * Math.exp(-west * west)
     }
     function near(u, H) {
         // Two hills, one at each edge, with a low meadow between them. The
@@ -141,9 +143,12 @@ Canvas {
             ctx.lineTo(sx, snowY + wobble)
         }
         ctx.closePath()
-        var cap = ctx.createLinearGradient(0, y0 - H * 0.34, 0, snowY)
+        // It is colder the higher you go, so the snow is whitest on the summits
+        // and greyer, thinner, toward its lower edge.
+        var cap = ctx.createLinearGradient(0, y0 - H * 0.33, 0, snowY + H * 0.02)
         cap.addColorStop(0, snowColor)
-        cap.addColorStop(1, mix(snowColor, farColor, 0.35))
+        cap.addColorStop(0.45, mix(snowColor, farColor, 0.2))
+        cap.addColorStop(1, mix(snowColor, farColor, 0.6))
         ctx.fillStyle = cap
         ctx.fill()
         // Below the snowfields, snow runs on down the steep gullies that score
@@ -151,9 +156,9 @@ Canvas {
         // and thinning out to nothing.
         for (var pk = 0; pk < peaks.length; pk++) {
             var peak = peaks[pk]
-            if (y0 - H * peak[1] > snowY - H * 0.015)
+            if (peak[1] < 0.28)
                 continue
-            for (var g = 0; g < 3; g++) {
+            for (var g = 0; g < 2; g++) {
                 var side = g === 1 ? 1 : -1
                 var slope = side < 0 ? peak[2] : peak[3]
                 var gu = peak[0] + side * (0.006 + 0.016 * noise(pk * 2.1 + g * 5, 11))

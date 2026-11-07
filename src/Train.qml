@@ -244,6 +244,57 @@ Item {
                 ctx.lineTo(topPt.x + (footPt.x - topPt.x) * 0.7 + 1, topPt.y + (footPt.y - topPt.y) * 0.75)
                 ctx.stroke()
             }
+            // Beyond the near hill the road keeps climbing, and comes back into
+            // view higher up and farther off: a thin line traversing the farther
+            // hill to the saddle in its ridge, where it goes over the pass. It is
+            // drawn before the near hill, so only the stretch above it shows.
+            function hash(i, seed) {
+                var v = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
+                return v - Math.floor(v)
+            }
+            function noise(v, seed) {
+                var i = Math.floor(v), f = v - i
+                var u = f * f * (3 - 2 * f)
+                return hash(i, seed) * (1 - u) + hash(i + 1, seed) * u
+            }
+            // The farther ridge's skyline, as Hills.qml draws it (mid()).
+            function ridgeY(px) {
+                var u = px / W
+                var shoulder = (u - 0.6) / 0.12
+                var pass = (u - 0.25) / 0.04
+                var west = (u - 0.14) / 0.07
+                var rise = H * (0.035 + 0.15 * noise(u * 2.6 + 5, 4)) + H * 0.025 * noise(u * 8.2, 5)
+                           + H * 0.07 * Math.exp(-shoulder * shoulder) - H * 0.04 * Math.exp(-pass * pass)
+                           + H * 0.03 * Math.exp(-west * west)
+                return H * root.horizon - rise
+            }
+            var saddle = { x: W * 0.25, y: ridgeY(W * 0.25) + H * 0.002 }
+            // It comes out from behind the near hill's top and rises steadily
+            // across the farther hill to the pass.
+            var hidden = { x: curve(far0, far1, far2, far3, 0.86).x - W * 0.12, y: H * root.horizon - H * 0.128 }
+            function upper(path) {
+                ctx.beginPath()
+                ctx.moveTo(hidden.x, hidden.y)
+                ctx.bezierCurveTo(hidden.x - W * 0.06, hidden.y - H * 0.006,
+                                  saddle.x + W * 0.07, saddle.y + H * 0.01,
+                                  saddle.x, saddle.y)
+            }
+            ctx.lineCap = "butt"
+            // The sliver of cut above it, then the road.
+            ctx.strokeStyle = Qt.darker(root.cutColor, 1.1)
+            ctx.lineWidth = Math.max(1, H * 0.0025)
+            ctx.save()
+            ctx.translate(0, -H * 0.003)
+            upper()
+            ctx.stroke()
+            ctx.restore()
+            ctx.strokeStyle = Qt.rgba(root.roadColor.r + (root.hazeColor.r - root.roadColor.r) * 0.2,
+                                      root.roadColor.g + (root.hazeColor.g - root.roadColor.g) * 0.2,
+                                      root.roadColor.b + (root.hazeColor.b - root.roadColor.b) * 0.2, 1)
+            ctx.lineWidth = Math.max(2, H * 0.0045)
+            upper()
+            ctx.stroke()
+
             // A nearer hill stands to the left of the cut. Its right flank comes
             // steeply down across the farther hill and the road's last stretch,
             // so the road passes out of sight behind it. Being nearer, it is
