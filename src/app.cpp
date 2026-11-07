@@ -17,15 +17,17 @@
 
 namespace {
 
-// The landscape is drawn in C++, off the GUI thread.
-void registerTypes() {
-    static const bool registered = [] {
+// What every window in the process shares, set up once before the first is
+// loaded: the controls' style, and the landscape types, drawn in C++.
+void prepareQml() {
+    static const bool prepared = [] {
+        QQuickStyle::setStyle("Material");
         qmlRegisterType<Hills>("Grove", 1, 0, "Hills");
         qmlRegisterType<TrackBed>("Grove", 1, 0, "TrackBed");
         qmlRegisterType<Field>("Grove", 1, 0, "Field");
         return true;
     }();
-    Q_UNUSED(registered);
+    Q_UNUSED(prepared);
 }
 
 } // namespace
@@ -127,9 +129,7 @@ void App::sessionChanged() {
 }
 
 bool App::load() {
-    registerTypes();
-    // The style is fixed before the first control is made.
-    QQuickStyle::setStyle("Material");
+    prepareQml();
     m_engine = std::make_unique<QQmlApplicationEngine>();
     QObject::connect(&m_translator, &Translator::changed, m_engine.get(), &QQmlEngine::retranslate);
     QQmlContext *context = m_engine->rootContext();

@@ -34,6 +34,14 @@ Field::Field(QQuickItem *parent) : PaintedLayer(parent) {
     connect(this, &Field::changed, this, &Field::scheduleRender);
 }
 
+void Field::setHorizon(double horizon) {
+    if (horizon == m_horizon)
+        return;
+    m_horizon = horizon;
+    emit changed();
+    emit viewChanged();
+}
+
 void Field::setGroundTop(double groundTop) {
     if (groundTop == m_groundTop)
         return;
@@ -48,7 +56,7 @@ void Field::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
     PaintedLayer::geometryChange(newGeometry, oldGeometry);
     // The far edge and the plant's foot move with the size.
     if (newGeometry.size() != oldGeometry.size())
-        emit changed();
+        emit viewChanged();
 }
 
 PaintedLayer::Painting Field::painting() const {

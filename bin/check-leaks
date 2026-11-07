@@ -1,0 +1,84 @@
+#!/bin/sh
+# The memory gate, in two parts:
+#
+# 1. Both test programs built with AddressSanitizer, LeakSanitizer and
+#    UndefinedBehaviorSanitizer and run (the unit tests, and the whole app
+#    driven offscreen by the scene tests). Any leak, memory error or undefined
+#    behaviour fails. No leak is suppressed.
+# 2. The soak test on a normal build: memory that stays referenced but is never
+#    let go escapes the leak checker, so the heap is measured over forty rounds
+#    of each part of a day and must not grow.
+#
+#   bin/check-leaks           the check
+#   bin/check-leaks --canary  proves the check works: plants a leak in a unit
+#                             test, and keeps memory in the soak test, and
+#                             passes only if both are caught
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+canary=0
+[ "${1:-}" = "--canary" ] && canary=1
+
+export QT_QPA_PLATFORM=offscreen
+export QT_QUICK_BACKEND=rhi
+export QSG_RHI_BACKEND=opengl
+# The desktop's own Qt plugins (the GTK theme, the input method) hold font
+# caches for the life of the process. They are not part of Grove and would
+# bury its results, so they are not loaded.
+unset QT_QPA_PLATFORMTHEME QT_IM_MODULE QT_STYLE_OVERRIDE
+export ASAN_OPTIONS=detect_leaks=1:detect_stack_use_after_return=1:strict_string_checks=1
+export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+
+failed=0
+for suite in grove_tests scene_tests; do
+    [ "$canary" = 1 ] && [ "$suite" != grove_tests ] && continue
+    build="$ROOT/build/asan-$suite"
+    mkdir -p "$build"
+    cd "$build"
+    qmake6 "$ROOT/tests/$suite.pro" "CONFIG+=debug sanitizer sanitize_address sanitize_undefined" "CONFIG-=release" >/dev/null
+    make -j"$(nproc)" >/dev/null
+    log="$build/check.log"
+    if [ "$canary" = 1 ]; then
+        GROVE_LEAK_CANARY=1 ./"$suite" leakCanary >"$log" 2>&1 || true
+    else
+        ./"$suite" >"$log" 2>&1 || failed=1
+    fi
+    # The sanitizers' exit status does not survive QTest's, so the report decides.
+    if grep -qE "ERROR: (AddressSanitizer|LeakSanitizer)|runtime error:" "$log"; then
+        failed=1
+        grep -E -A14 "ERROR: (AddressSanitizer|LeakSanitizer)|runtime error:" "$log" | head -40
+        grep -E "^SUMMARY:" "$log" || true
+    fi
+    echo "$suite: $(grep -E '^Totals:' "$log" || echo 'did not finish')"
+done
+
+if [ "$canary" = 1 ]; then
+    if [ "$failed" = 1 ] && grep -q "leakCanary" "$ROOT/build/asan-grove_tests/check.log"; then
+        echo "canary: the planted leak was caught, in leakCanary"
+    else
+        echo "canary: the planted leak was NOT caught"
+        exit 1
+    fi
+fi
+[ "$canary" = 0 ] && [ "$failed" = 0 ] && echo "no leaks, memory errors or undefined behaviour"
+
+build="$ROOT/build/scene_tests"
+mkdir -p "$build"
+cd "$build"
+qmake6 "$ROOT/tests/scene_tests.pro" >/dev/null
+make -j"$(nproc)" >/dev/null
+if [ "$canary" = 1 ]; then
+    if GROVE_SOAK=1 GROVE_LEAK_CANARY=1 ./scene_tests repeatingTheDayDoesNotGrowTheHeap:garden >"$build/soak.log" 2>&1; then
+        echo "canary: memory kept in the soak test was NOT caught"
+        exit 1
+    fi
+    echo "canary: memory kept in the soak test was caught ($(grep -oE 'heap grew by [0-9]+ bytes' "$build/soak.log"))"
+    exit 0
+fi
+if GROVE_SOAK=1 ./scene_tests repeatingTheDayDoesNotGrowTheHeap >"$build/soak.log" 2>&1; then
+    grep -E "heap grew" "$build/soak.log" | sed 's/.*) /soak: /'
+else
+    failed=1
+    grep -E "heap grew|FAIL|Loc:" "$build/soak.log"
+fi
+exit "$failed"

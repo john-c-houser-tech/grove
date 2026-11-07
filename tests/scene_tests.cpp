@@ -6,11 +6,15 @@
 #include <QColor>
 #include <QDir>
 #include <QImage>
+#include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <memory>
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 #include "app.h"
 
@@ -23,6 +27,9 @@ private slots:
     {
         m_dir = std::make_unique<QTemporaryDir>();
         QVERIFY(m_dir->isValid());
+        // Any warning is a failure: a binding loop or a QML error is a bug
+        // even when the window still looks right.
+        QTest::failOnWarning(QRegularExpression(".*"));
     }
     void cleanup()
     {
@@ -90,6 +97,64 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(tonesIn(grab(), 0.8, 1.0) > 200, 5000);
         // And the hills to the middle.
         QVERIFY(tonesIn(grab(), 0.3, 0.6) > 50);
+    }
+
+    // Memory still referenced but never let go, which no leak checker sees,
+    // shows as a heap that keeps growing: forty rounds of opening the garden,
+    // giving up or finishing must leave it within a megabyte of where it was.
+    // A landscape picture is megabytes and a garden tile with its plant a
+    // hundred kilobytes, so losing one a round would show; the allocator's own
+    // churn is a few hundred kilobytes either way. It takes a minute or more,
+    // so bin/check-leaks runs it (GROVE_SOAK=1) rather than bin/test.
+    void repeatingTheDayDoesNotGrowTheHeap_data()
+    {
+        QTest::addColumn<QString>("part");
+        for (const char *part : {"garden", "giveup", "finish"})
+            QTest::newRow(part) << QString(part);
+    }
+    void repeatingTheDayDoesNotGrowTheHeap()
+    {
+        if (!qEnvironmentVariableIsSet("GROVE_SOAK"))
+            QSKIP("set GROVE_SOAK=1 to run; bin/check-leaks does");
+        if (heapInUse() == 0)
+            QSKIP("needs glibc to measure the heap");
+        QFETCH(QString, part);
+        const int times = 40;
+        start(1);
+        for (int seed = 1; seed <= 6; ++seed)
+            m_app->garden().record(plant(seed));
+        const auto once = [&] {
+            if (part == "garden") {
+                press(Qt::Key_G);
+                QTRY_VERIFY(find<QQuickItem>("gardenLoader")->property("item").value<QObject *>());
+                press(Qt::Key_Escape);
+                QTRY_VERIFY(!find<QQuickItem>("gardenLoader")->property("item").value<QObject *>());
+            } else if (part == "giveup") {
+                press(Qt::Key_Space);
+                press(Qt::Key_Space);
+                QTRY_VERIFY(find<QObject>("confirm")->property("opened").toBool());
+                press(Qt::Key_Return);
+                QTRY_VERIFY(!find<QObject>("confirm")->property("opened").toBool());
+            } else {
+                press(Qt::Key_Space);
+                QTRY_COMPARE_WITH_TIMEOUT(m_app->backend().state(), QString("done"), 3000);
+            }
+        };
+        for (int i = 0; i < 5; ++i)
+            once();
+        // For bin/check-leaks --canary: keep a garden tile's worth a round, to
+        // show that the test sees memory kept like that.
+        const bool canary = qEnvironmentVariableIsSet("GROVE_LEAK_CANARY");
+        QList<QByteArray> kept;
+        const qint64 before = settledHeap();
+        for (int i = 0; i < times; ++i) {
+            once();
+            if (canary)
+                kept.append(QByteArray(100 * 1024, 'x'));
+        }
+        const qint64 grown = settledHeap() - before;
+        qInfo("%s x%d: heap grew by %lld bytes", qPrintable(part), times, grown);
+        QVERIFY2(grown < 1024 * 1024, qPrintable(QString("grew by %1 bytes").arg(grown)));
     }
 
     // Not a test: with GROVE_SHOTS set to a directory, saves the scene at
@@ -163,6 +228,30 @@ private:
         if (!found)
             qFatal("no item named %s", name);
         return found;
+    }
+
+    // The heap once JavaScript garbage is collected and deferred deletes are
+    // done, so only what is really kept is counted.
+    qint64 settledHeap()
+    {
+        for (int i = 0; i < 3; ++i) {
+            m_app->engine()->collectGarbage();
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+            QTest::qWait(50);
+        }
+        return heapInUse();
+    }
+
+    // Bytes the program holds from the heap, including large blocks mapped on
+    // their own; zero where glibc is not there to ask.
+    static qint64 heapInUse()
+    {
+#ifdef __GLIBC__
+        const struct mallinfo2 info = mallinfo2();
+        return static_cast<qint64>(info.uordblks + info.hblkhd);
+#else
+        return 0;
+#endif
     }
 
     QImage grab() const { return m_app->window()->grabWindow(); }

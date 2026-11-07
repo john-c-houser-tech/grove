@@ -55,8 +55,9 @@ public:
 
     // Loads the window. False if it could not be made.
     bool load();
-    // The window, once loaded.
+    // The window and its engine, once loaded.
     QQuickWindow *window() const;
+    QQmlApplicationEngine *engine() const { return m_engine.get(); }
 
     Backend &backend() { return m_backend; }
     Garden &garden() { return m_garden; }

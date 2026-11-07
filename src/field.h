@@ -17,7 +17,7 @@ class Field : public PaintedLayer {
     Q_OBJECT
     // The horizon, as a fraction of the height, and where the field's far edge
     // meets the meadow, in pixels from the top (by default, near the bottom).
-    Q_PROPERTY(double horizon MEMBER m_horizon NOTIFY changed)
+    Q_PROPERTY(double horizon READ horizon WRITE setHorizon NOTIFY changed)
     Q_PROPERTY(double groundTop READ groundTop WRITE setGroundTop NOTIFY changed)
     // Where the rows meet on the horizon, and where the plant stands, as
     // fractions of the width.
@@ -34,9 +34,11 @@ class Field : public PaintedLayer {
     Q_PROPERTY(double snow MEMBER m_snow NOTIFY changed)
     Q_PROPERTY(bool frost MEMBER m_frost NOTIFY changed)
     // Where the field ends, out at 40 m, and where the plant's foot is, in
-    // pixels from the top.
-    Q_PROPERTY(double farEdgeY READ farEdgeY NOTIFY changed)
-    Q_PROPERTY(double plantBaseY READ plantBaseY NOTIFY changed)
+    // pixels from the top. They follow only the size and the horizon, so they
+    // have a signal of their own: groundTop is usually bound to farEdgeY, and
+    // sharing `changed` with it would make that binding loop.
+    Q_PROPERTY(double farEdgeY READ farEdgeY NOTIFY viewChanged)
+    Q_PROPERTY(double plantBaseY READ plantBaseY NOTIFY viewChanged)
 
 public:
     struct Look {
@@ -49,6 +51,8 @@ public:
 
     explicit Field(QQuickItem *parent = nullptr);
 
+    double horizon() const { return m_horizon; }
+    void setHorizon(double horizon);
     double groundTop() const { return m_groundTop >= 0 ? m_groundTop : height() * 0.874; }
     void setGroundTop(double groundTop);
     double farEdgeY() const;
@@ -58,6 +62,7 @@ public:
 
 signals:
     void changed();
+    void viewChanged();
 
 protected:
     Painting painting() const override;

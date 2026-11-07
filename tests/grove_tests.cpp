@@ -691,6 +691,17 @@ private slots:
         QCOMPARE(translator.translate("Main", "Keys"), QString("Teclas"));
     }
 
+    // Not a test of Grove: a leak planted for bin/check-leaks --canary, which
+    // passes only if the leak check catches it, so a clean report means
+    // something.
+    void leakCanary()
+    {
+        if (!qEnvironmentVariableIsSet("GROVE_LEAK_CANARY"))
+            QSKIP("only for bin/check-leaks --canary");
+        auto *lost = new QByteArray(1024, 'x');
+        QCOMPARE(lost->size(), 1024);
+    }
+
 private:
     static int peakOf(const QByteArray &pcm, int from, int to)
     {
