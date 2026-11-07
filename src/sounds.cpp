@@ -125,10 +125,9 @@ QByteArray Sounds::synthesizeTrain(int rate) {
     addCrossingSignal(out, rate, 16.0, 0.85, 1100, 3.0, pass);
 
     // Crossing bells start before the train is there and run until it is clear.
-    int strike = 0;
-    for (double t = 12.5; t < 34.0; t += 0.62, ++strike) {
+    for (double t = 12.5; t < 34.0; t += 0.62) {
         const double level = 0.06 + 0.3 * qExp(-qPow((t - pass) / 7.0, 2));
-        addBell(out, rate, t, level, strike % 2 ? 1380 : 1450);
+        addBell(out, rate, t, level, 1450);
     }
 
     // Everything is far away: duller, with the echo of the hills.

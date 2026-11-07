@@ -102,14 +102,18 @@ Item {
             ctx.closePath()
             ctx.fillStyle = root.floorColor
             ctx.fill()
-            // A dirt road comes up from the near meadow and over the rails at the
-            // crossing, narrowing with distance.
-            var cx = W * root.crossingX, cy = root.trackY(root.crossingX)
+            // A dirt road comes up from the near meadow, over the rails and a
+            // little way on, narrowing with distance. The signal stands on its
+            // right-hand verge, so the road lies just to the left of it.
+            var post = W * root.crossingX, cy = root.trackY(root.crossingX)
+            var gap = H * 0.006, nearWidth = H * 0.05
             ctx.beginPath()
-            ctx.moveTo(cx - H * 0.006, cy - H * 0.004)
-            ctx.lineTo(cx + H * 0.006, cy - H * 0.004)
-            ctx.lineTo(cx + H * 0.05, H)
-            ctx.lineTo(cx - H * 0.01, H)
+            ctx.moveTo(post - gap - nearWidth * 0.6, cy - H * 0.022)
+            ctx.lineTo(post - gap - nearWidth * 0.52, cy - H * 0.022)
+            ctx.lineTo(post - gap, cy)
+            ctx.lineTo(post - gap + H * 0.05, H)
+            ctx.lineTo(post - gap - nearWidth - H * 0.07, H)
+            ctx.lineTo(post - gap - nearWidth, cy)
             ctx.closePath()
             ctx.fillStyle = root.roadColor
             ctx.fill()
