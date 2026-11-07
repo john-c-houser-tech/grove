@@ -9,6 +9,10 @@ Canvas {
     property int seed: 1
     property bool wilted: false
     property color flowerColor: "#FFD60A"
+    // Where the trunk meets the ground, as a fraction of the height.
+    property real base: 0.88
+    // The soil it is planted in; a small mound of it is heaped around the trunk.
+    property color soilColor: "transparent"
     // The light on the plant: a blue wash at night, a golden one at dawn and dusk.
     property color nightTint: "transparent"
     property color warmTint: "transparent"
@@ -22,8 +26,11 @@ Canvas {
     property var tips: []
     property int builtSeed: -1
     property real builtHeight: 0
+    property real builtBase: 0
 
     onProgressChanged: requestPaint()
+    onBaseChanged: requestPaint()
+    onSoilColorChanged: requestPaint()
     onWiltedChanged: requestPaint()
     onFlowerColorChanged: requestPaint()
     onNightTintChanged: requestPaint()
@@ -99,11 +106,12 @@ Canvas {
             }
         }
 
-        grow(width / 2, height * 0.88, -Math.PI / 2, unit * 0.2, 0, 0)
+        grow(width / 2, height * base, -Math.PI / 2, unit * 0.2, 0, 0)
         segments = segs
         tips = ends
         builtSeed = seed
         builtHeight = height
+        builtBase = base
     }
 
     function drawLeaf(ctx, x, y, angle, size, color) {
@@ -138,7 +146,7 @@ Canvas {
         ctx.reset()
         if (width <= 0 || height <= 0)
             return
-        if (seed !== builtSeed || Math.abs(height - builtHeight) > 0.5)
+        if (seed !== builtSeed || Math.abs(height - builtHeight) > 0.5 || Math.abs(base - builtBase) > 0.0005)
             build()
 
         // A wilted plant keeps the shape it reached but loses its colour.
@@ -147,8 +155,37 @@ Canvas {
         var leafScale = wilted ? 0.6 : 1
         ctx.lineCap = "round"
 
-        if (progress <= 0)
+        // A small heap of earth where the seed went in; the trunk rises out of it.
+        function mound() {
+            if (soilColor.a <= 0)
+                return
+            // Wide enough to bury the round foot of the trunk.
+            var r = Math.max(5, height * 0.026)
+            ctx.save()
+            ctx.translate(width / 2, height * base)
+            // The planting hollow, a shade darker than the soil around it.
+            ctx.save()
+            ctx.scale(1, 0.32)
+            ctx.beginPath()
+            ctx.arc(0, 0, r * 1.15, 0, Math.PI)
+            ctx.closePath()
+            ctx.fillStyle = Qt.darker(soilColor, 1.35)
+            ctx.fill()
+            ctx.restore()
+            // The heap of loose earth over it.
+            ctx.scale(1, 0.45)
+            ctx.beginPath()
+            ctx.arc(0, 0.5, r, Math.PI, 0)
+            ctx.closePath()
+            ctx.fillStyle = Qt.lighter(soilColor, 1.55)
+            ctx.fill()
+            ctx.restore()
+        }
+
+        if (progress <= 0) {
+            mound()
             return
+        }
 
         for (var i = 0; i < segments.length; i++) {
             var s = segments[i]
@@ -186,6 +223,8 @@ Canvas {
                 drawLeaf(ctx, lx, ly, heading + l.side * tilt, height * 0.035 * l.size * grown * leafScale, wilted ? wiltedLeaf : lit(leafColor(l.tone)))
             }
         }
+
+        mound()
 
         if (!wilted) {
             var bloom = clamp((progress - 0.9) / 0.1)

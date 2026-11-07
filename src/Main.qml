@@ -99,21 +99,10 @@ ApplicationWindow {
 
         SkyBackdrop { anchors.fill: parent }
 
-        GrowingPlant {
-            anchors.fill: parent
-            anchors.topMargin: 90
-            progress: weather.growth
-            seed: backend.seed
-            wilted: backend.state === "wilted"
-            flowerColor: theme.accent
-            nightTint: light.nightTint
-            warmTint: light.warmTint
-            weatherTint: win.weatherTint
-            season: weather.season
-        }
-
-        // The ground the plant stands in.
+        // The ground the plant stands in. It is drawn first, so the plant
+        // grows out of it rather than from behind it.
         Rectangle {
+            id: ground
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -126,6 +115,23 @@ ApplicationWindow {
                 height: 4 + 16 * weather.snow
                 color: weather.season === "winter" || weather.snow > 0.05 ? Qt.tint(Qt.tint("#cfdde0", light.nightTint), light.warmTint) : Qt.tint(Qt.tint(Qt.tint("#3a2d20", win.weatherTint), light.nightTint), light.warmTint)
             }
+        }
+
+        GrowingPlant {
+            id: plant
+            anchors.fill: parent
+            anchors.topMargin: 90
+            // The trunk goes into the soil halfway down the band of earth.
+            base: (ground.y + ground.height / 2 - y) / height
+            soilColor: ground.color
+            progress: weather.growth
+            seed: backend.seed
+            wilted: backend.state === "wilted"
+            flowerColor: theme.accent
+            nightTint: light.nightTint
+            warmTint: light.warmTint
+            weatherTint: win.weatherTint
+            season: weather.season
         }
 
         Precipitation {

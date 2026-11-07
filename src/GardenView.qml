@@ -88,10 +88,11 @@ Rectangle {
                     border.width: 1
 
                     Rectangle {
+                        id: soil
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: caption.top
-                        height: 6
+                        height: 8
                         color: model.season === "winter" ? "#cfdde0" : "#2a2018"
                     }
 
@@ -100,7 +101,9 @@ Rectangle {
                         anchors.right: parent.right
                         anchors.top: parent.top
                         anchors.bottom: caption.top
-                        anchors.bottomMargin: 6
+                        // The trunk goes into the middle of the strip of soil.
+                        base: (height - soil.height / 2) / height
+                        soilColor: soil.color
                         progress: model.progress
                         seed: model.seed
                         wilted: model.outcome === "wilted"
