@@ -2,7 +2,8 @@
 
 ![Grove growing an autumn plant under soft clouds](docs/grove.png)
 
-A focus timer that grows a plant while you work. Press Space to plant a seed.
+A focus timer that grows a plant while you work. Press Space to plant a seed
+in a furrow of the ploughed field.
 Stay with it for 25 minutes and the plant blooms; give up and it wilts. Either
 way it stays in your garden.
 

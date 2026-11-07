@@ -74,14 +74,11 @@ Item {
         running = true
     }
 
-    // The track bends a little toward the viewer at the crossing, so things
-    // there are slightly larger than they are farther along.
-    function nearness(x) {
-        var d = (x - crossingX) / 0.3
-        return Math.exp(-d * d)
-    }
-    function sizeAt(x) { return 0.88 + 0.12 * nearness(x) }
-    function trackY(x) { return height * (horizon - 0.085) + height * 0.014 * nearness(x) }
+    // The track is straight and level across the valley, and everything on it
+    // is at one distance and so one scale: a train is rigid, and every wheel
+    // sits on the rail.
+    function sizeAt(x) { return 1 }
+    function trackY(x) { return height * (horizon - 0.085) }
 
     // Where each vehicle's front end is, in pixels, laid end to end from the
     // front of the train.

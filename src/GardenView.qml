@@ -103,7 +103,6 @@ Rectangle {
                         anchors.bottom: caption.top
                         // The trunk goes into the middle of the strip of soil.
                         base: (height - soil.height / 2) / height
-                        soilColor: soil.color
                         progress: model.progress
                         seed: model.seed
                         wilted: model.outcome === "wilted"

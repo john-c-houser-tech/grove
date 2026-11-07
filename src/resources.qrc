@@ -6,6 +6,7 @@
         <file alias="Clouds.qml">Clouds.qml</file>
         <file alias="CloudShape.qml">CloudShape.qml</file>
         <file alias="Hills.qml">Hills.qml</file>
+        <file alias="Field.qml">Field.qml</file>
         <file alias="Plane.qml">Plane.qml</file>
         <file alias="SoftGlow.qml">SoftGlow.qml</file>
         <file alias="Train.qml">Train.qml</file>
