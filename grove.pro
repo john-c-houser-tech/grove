@@ -6,6 +6,11 @@ TEMPLATE = app
 
 HEADERS += \
     src/backend.h \
+    src/field.h \
+    src/hills.h \
+    src/layer.h \
+    src/terrain.h \
+    src/trackbed.h \
     src/light.h \
     src/weather.h \
     src/sounds.h \
@@ -17,6 +22,10 @@ HEADERS += \
 SOURCES += \
     src/main.cpp \
     src/backend.cpp \
+    src/field.cpp \
+    src/hills.cpp \
+    src/layer.cpp \
+    src/trackbed.cpp \
     src/light.cpp \
     src/weather.cpp \
     src/sounds.cpp \

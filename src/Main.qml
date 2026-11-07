@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import Grove
 
 ApplicationWindow {
     id: win
@@ -80,7 +81,10 @@ ApplicationWindow {
         LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
         LayoutMirroring.childrenInherit: true
 
-        SkyBackdrop { anchors.fill: parent }
+        SkyBackdrop {
+            anchors.fill: parent
+            groundY: field.farEdgeY
+        }
 
         // The ground the plant stands in. It is drawn first, so the plant
         // grows out of it rather than from behind it.

@@ -1,14 +1,19 @@
 #include <QDir>
+#include <QPainter>
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
 
 #include "backend.h"
+#include "field.h"
 #include "garden.h"
+#include "hills.h"
+#include "layer.h"
 #include "light.h"
 #include "notifier.h"
 #include "sounds.h"
 #include "theme.h"
+#include "trackbed.h"
 #include "translator.h"
 #include "weather.h"
 
@@ -113,6 +118,70 @@ private slots:
         backend.advance(10);
         QCOMPARE(spy.count(), 1);
         QCOMPARE(backend.progress(), 1.0);
+    }
+
+    void aLayerKeepsOnlyTheRowsWithSomethingInThem()
+    {
+        const auto band = [](QPainter &p, double width, double) { p.fillRect(QRectF(0, 30, width, 20), Qt::red); };
+        const PaintedLayer::Picture picture = PaintedLayer::draw(band, QSizeF(100, 100), -1, 1);
+        QCOMPARE(picture.top, 30.0);
+        QCOMPARE(picture.image.size(), QSize(100, 20));
+    }
+
+    void aLayerIsDrawnAtTheDisplaysScale()
+    {
+        const auto band = [](QPainter &p, double width, double) { p.fillRect(QRectF(0, 30, width, 20), Qt::red); };
+        const PaintedLayer::Picture picture = PaintedLayer::draw(band, QSizeF(100, 100), -1, 2);
+        QCOMPARE(picture.top, 30.0);
+        QCOMPARE(picture.image.size(), QSize(200, 40));
+        QCOMPARE(picture.image.devicePixelRatio(), 2.0);
+    }
+
+    void nothingIsDrawnWhereTheGroundCoversIt()
+    {
+        const auto all = [](QPainter &p, double width, double height) { p.fillRect(QRectF(0, 0, width, height), Qt::red); };
+        QCOMPARE(PaintedLayer::draw(all, QSizeF(100, 100), 60, 1).image.size(), QSize(100, 60));
+        // Nothing drawn, nothing kept.
+        const auto none = [](QPainter &, double, double) {};
+        QVERIFY(PaintedLayer::draw(none, QSizeF(100, 100), -1, 1).image.isNull());
+    }
+
+    void theFieldIsSeenFromStandingHeight()
+    {
+        Field field;
+        field.setSize(QSizeF(800, 1000));
+        // The far edge is 40 m off and the plant 4 m, seen from 1.6 m up.
+        QCOMPARE(field.farEdgeY(), 600 + 1000 * 0.21 * 4 * 1.6 / 40);
+        QCOMPARE(field.plantBaseY(), 600 + 1000 * 0.21 * 4 * 1.6 / 4);
+    }
+
+    void eachPartOfTheLandscapeKeepsToItsOwnBand()
+    {
+        const QSizeF size(400, 500);
+        const double ground = 500 * 0.6 + 500 * 0.21 * 4 * 1.6 / 40;
+        const auto field = [&](const QString &part) {
+            const Field::Look look{0.6, ground, 0.5, 0.33, part, QColor("#2a2018"), QColor("#9fb7c4"), 0, false};
+            return PaintedLayer::draw([look](QPainter &p, double w, double h) { Field::paint(p, look, w, h); }, size, -1, 1);
+        };
+        // The far field starts at its far edge and runs to the bottom.
+        const PaintedLayer::Picture far = field("far");
+        QVERIFY(qAbs(far.top - ground) < 1);
+        QCOMPARE(far.top + far.image.height(), 500.0);
+        // The rows nearer than the plant are only the bottom of the window.
+        const PaintedLayer::Picture nearer = field("near");
+        QVERIFY(nearer.top > ground + 100);
+
+        // The hills stop where the ground covers them, and the near hills
+        // are lower than the far range.
+        const auto hills = [&](const QString &part) {
+            const Hills::Look look{0.6, part, 0.6, QColor("#6b7f9c"), QColor("#46605a"), QColor("#30493b"),
+                                   QColor("#9fb7c4"), QColor("#4d5a6c"), QColor("#2f3e35"), 1, 0.5, 0.3, QColor("#f2f6fa")};
+            return PaintedLayer::draw([look](QPainter &p, double w, double h) { Hills::paint(p, look, w, h); }, size, ground, 1);
+        };
+        const PaintedLayer::Picture back = hills("back"), front = hills("front");
+        QCOMPARE(back.top + back.image.height(), std::ceil(ground));
+        QVERIFY(back.top > 500 * 0.6 - 500 * 0.36);
+        QVERIFY(front.top > back.top + 500 * 0.15);
     }
 
     void sunriseIsEarlierInSummer()

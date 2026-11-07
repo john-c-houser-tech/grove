@@ -6,20 +6,35 @@
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QtQml/qqml.h>
 #include <QQuickStyle>
 #include <QRandomGenerator>
 #include <QUrl>
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 #include "backend.h"
+#include "field.h"
 #include "garden.h"
+#include "hills.h"
 #include "light.h"
 #include "notifier.h"
 #include "sounds.h"
 #include "theme.h"
+#include "trackbed.h"
 #include "translator.h"
 #include "weather.h"
 
 int main(int argc, char *argv[]) {
+#ifdef __GLIBC__
+    // Pictures of the landscape are drawn on worker threads into buffers of a
+    // few megabytes. glibc raises its threshold for giving such buffers their
+    // own mapping after the first is freed, so later ones come from the heap
+    // and, once freed, stay with the process. Fixing the threshold returns
+    // each one to the system when it goes.
+    mallopt(M_MMAP_THRESHOLD, 128 * 1024);
+#endif
     QGuiApplication app(argc, argv);
     app.setApplicationName("grove");
     app.setApplicationVersion("0.8.2");
@@ -98,6 +113,11 @@ int main(int argc, char *argv[]) {
         }
     });
     QObject::connect(&backend, &Backend::progressChanged, &weather, [&] { weather.setProgress(backend.progress()); });
+
+    // The landscape is drawn in C++, off the GUI thread.
+    qmlRegisterType<Hills>("Grove", 1, 0, "Hills");
+    qmlRegisterType<TrackBed>("Grove", 1, 0, "TrackBed");
+    qmlRegisterType<Field>("Grove", 1, 0, "Field");
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);

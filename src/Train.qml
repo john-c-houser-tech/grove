@@ -1,4 +1,5 @@
 import QtQuick
+import Grove
 
 // The railway across the valley, and the night train that runs on it.
 //
@@ -27,6 +28,8 @@ Item {
     property color fillColor: "#3d3a2c"
     property color hillColor: "#44605a"
     property color hazeColor: "#9fb7c4"
+    // Below this height the ground in front hides the valley floor, so it is not drawn.
+    property real coveredFrom: -1
 
     // The crossing stands a little right of the middle, clear of the plant.
     readonly property real crossingX: 0.68
@@ -100,250 +103,19 @@ Item {
 
     // The valley floor, with the track along its far edge. The hills in front
     // cover its lower part.
-    Canvas {
-        id: bed
+    TrackBed {
         anchors.fill: parent
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
-        Connections {
-            target: root
-            function onFloorColorChanged() { bed.requestPaint() }
-            function onBallastColorChanged() { bed.requestPaint() }
-            function onRailColorChanged() { bed.requestPaint() }
-            function onRoadColorChanged() { bed.requestPaint() }
-            function onCutColorChanged() { bed.requestPaint() }
-            function onFillColorChanged() { bed.requestPaint() }
-            function onHillColorChanged() { bed.requestPaint() }
-            function onHazeColorChanged() { bed.requestPaint() }
-        }
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            var W = width, H = height
-            if (W <= 0 || H <= 0)
-                return
-            function line() {
-                ctx.beginPath()
-                for (var x = 0; x <= W; x += 4)
-                    x === 0 ? ctx.moveTo(x, root.trackY(x / W)) : ctx.lineTo(x, root.trackY(x / W))
-            }
-            line()
-            ctx.lineTo(W, H)
-            ctx.lineTo(0, H)
-            ctx.closePath()
-            ctx.fillStyle = root.floorColor
-            ctx.fill()
-            // A dirt road. On this side it comes a little toward us, then curves
-            // away to the right along the valley floor and goes behind the hill
-            // there. Beyond the rails it climbs the hillside to the left, where
-            // the hill is higher, and goes into a cut in the slope. The signal
-            // stands on its right-hand verge.
-            var post = W * root.crossingX, cy = root.trackY(root.crossingX)
-            var gap = H * 0.006, crossing = H * 0.05
-            var centre = post - gap - crossing / 2
-
-            function curve(p0, p1, p2, p3, t) {
-                var u = 1 - t
-                return {
-                    x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
-                    y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
-                }
-            }
-            // A road along a curve, seen from low down: as wide as the crossing
-            // where it runs straight toward or away from us, thin where it turns
-            // to run across the view, and narrower with distance (farther).
-            function road(p0, p1, p2, p3, farther) {
-                var upper = [], lower = []
-                for (var i = 0; i <= 40; i++) {
-                    var t = i / 40
-                    var at = curve(p0, p1, p2, p3, t)
-                    var next = curve(p0, p1, p2, p3, Math.min(1, t + 0.01)), prev = curve(p0, p1, p2, p3, Math.max(0, t - 0.01))
-                    var dx = next.x - prev.x, dy = next.y - prev.y, len = Math.sqrt(dx * dx + dy * dy) || 1
-                    var toward = Math.abs(dy) / len
-                    var shrink = 1 - farther * t
-                    var half = H * (0.006 + 0.019 * toward) * shrink
-                    var nx = -dy / len, ny = dx / len
-                    upper.push({ x: at.x + nx * half, y: at.y + ny * half * (1 - toward) - (1 - toward) * half * 0.2 })
-                    lower.push({ x: at.x - nx * half, y: at.y - ny * half * (1 - toward) + (1 - toward) * half * 0.2 })
-                }
-                ctx.beginPath()
-                ctx.moveTo(upper[0].x, upper[0].y)
-                for (var a = 1; a < upper.length; a++)
-                    ctx.lineTo(upper[a].x, upper[a].y)
-                for (var b = lower.length - 1; b >= 0; b--)
-                    ctx.lineTo(lower[b].x, lower[b].y)
-                ctx.closePath()
-                ctx.fill()
-                return { upper: upper, lower: lower }
-            }
-
-            ctx.fillStyle = root.roadColor
-            // Near side.
-            road({ x: centre, y: cy }, { x: centre, y: cy + H * 0.03 },
-                 { x: centre + W * 0.1, y: cy + H * 0.034 }, { x: W * 1.08, y: cy + H * 0.028 }, 0)
-            // Far side: the road is cut into the hillside as it climbs, like an
-            // inslope road. It leaves the rails at full width, bends left and
-            // climbs across the face of the shoulder of hill, with a cut slope of
-            // bare earth above it and a fill slope below, then curves around
-            // the shoulder and out of sight.
-            var far0 = { x: centre, y: cy }, far1 = { x: centre - W * 0.006, y: cy - H * 0.02 }
-            var far2 = { x: centre - W * 0.06, y: cy - H * 0.03 }, far3 = { x: centre - W * 0.13, y: cy - H * 0.056 }
-            // Measure the road's edges first, without drawing.
-            var edges = (function () {
-                var saved = ctx.fillStyle
-                ctx.fillStyle = "transparent"
-                var e = road(far0, far1, far2, far3, 0.7)
-                ctx.fillStyle = saved
-                return e
-            })()
-            var n = edges.upper.length
-            function along(i) { return i / (n - 1) }
-            // The fill slope: earth tipped down the hill below the road, deepest
-            // where the road is farthest out on the slope.
-            var fillFrom = Math.floor(n * 0.2)
-            ctx.fillStyle = root.fillColor
-            ctx.beginPath()
-            ctx.moveTo(edges.lower[fillFrom].x, edges.lower[fillFrom].y)
-            for (var i = fillFrom + 1; i < n; i++)
-                ctx.lineTo(edges.lower[i].x, edges.lower[i].y)
-            for (var k = n - 1; k >= fillFrom; k--) {
-                var tf = (along(k) - along(fillFrom)) / (1 - along(fillFrom))
-                var drop = H * 0.012 * Math.sin(Math.PI * Math.min(1, tf * 1.1)) * (1 - 0.5 * along(k))
-                ctx.lineTo(edges.lower[k].x + W * 0.004 * tf, edges.lower[k].y + drop)
-            }
-            ctx.closePath()
-            ctx.fill()
-            // The road itself.
-            ctx.fillStyle = root.roadColor
-            road(far0, far1, far2, far3, 0.7)
-            // The cut slope: the bank left where the road was dug into the hill,
-            // tallest partway up and gone where the road leaves the flat.
-            var cutFrom = Math.floor(n * 0.25)
-            var cutTop = []
-            for (var c = cutFrom; c < n; c++) {
-                var tc = (along(c) - along(cutFrom)) / (1 - along(cutFrom))
-                var tall = H * (0.004 + 0.02 * Math.sin(Math.PI * 0.5 * Math.min(1, tc * 1.6))) * (1 - 0.35 * tc)
-                cutTop.push({ x: edges.upper[c].x - W * 0.003 * tc, y: edges.upper[c].y - tall })
-            }
-            ctx.fillStyle = root.cutColor
-            ctx.beginPath()
-            ctx.moveTo(edges.upper[cutFrom].x, edges.upper[cutFrom].y)
-            for (var u2 = cutFrom + 1; u2 < n; u2++)
-                ctx.lineTo(edges.upper[u2].x, edges.upper[u2].y)
-            for (var v2 = cutTop.length - 1; v2 >= 0; v2--)
-                ctx.lineTo(cutTop[v2].x, cutTop[v2].y)
-            ctx.closePath()
-            ctx.fill()
-            // Rain has scored the cut with short runnels down its face.
-            ctx.strokeStyle = Qt.rgba(root.cutColor.r * 0.82, root.cutColor.g * 0.82, root.cutColor.b * 0.82, 0.45)
-            ctx.lineWidth = 1
-            for (var r2 = 3; r2 < cutTop.length - 2; r2 += 5) {
-                var topPt = cutTop[r2], footPt = edges.upper[cutFrom + r2]
-                ctx.beginPath()
-                ctx.moveTo(topPt.x, topPt.y + (footPt.y - topPt.y) * 0.15)
-                ctx.lineTo(topPt.x + (footPt.x - topPt.x) * 0.7 + 1, topPt.y + (footPt.y - topPt.y) * 0.75)
-                ctx.stroke()
-            }
-            // Beyond the near hill the road keeps climbing, and comes back into
-            // view higher up and farther off: a thin line traversing the farther
-            // hill to the saddle in its ridge, where it goes over the pass. It is
-            // drawn before the near hill, so only the stretch above it shows.
-            function hash(i, seed) {
-                var v = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
-                return v - Math.floor(v)
-            }
-            function noise(v, seed) {
-                var i = Math.floor(v), f = v - i
-                var u = f * f * (3 - 2 * f)
-                return hash(i, seed) * (1 - u) + hash(i + 1, seed) * u
-            }
-            // The farther ridge's skyline, as Hills.qml draws it (mid()).
-            function ridgeY(px) {
-                var u = px / W
-                var shoulder = (u - 0.6) / 0.12
-                var pass = (u - 0.25) / 0.04
-                var west = (u - 0.14) / 0.07
-                var rise = H * (0.035 + 0.15 * noise(u * 2.6 + 5, 4)) + H * 0.025 * noise(u * 8.2, 5)
-                           + H * 0.07 * Math.exp(-shoulder * shoulder) - H * 0.04 * Math.exp(-pass * pass)
-                           + H * 0.03 * Math.exp(-west * west)
-                return H * root.horizon - rise
-            }
-            var saddle = { x: W * 0.25, y: ridgeY(W * 0.25) + H * 0.002 }
-            // It comes out from behind the near hill's top and rises steadily
-            // across the farther hill to the pass.
-            var hidden = { x: curve(far0, far1, far2, far3, 0.86).x - W * 0.12, y: H * root.horizon - H * 0.128 }
-            function upper(path) {
-                ctx.beginPath()
-                ctx.moveTo(hidden.x, hidden.y)
-                ctx.bezierCurveTo(hidden.x - W * 0.06, hidden.y - H * 0.006,
-                                  saddle.x + W * 0.07, saddle.y + H * 0.01,
-                                  saddle.x, saddle.y)
-            }
-            ctx.lineCap = "butt"
-            // The sliver of cut above it, then the road.
-            ctx.strokeStyle = Qt.darker(root.cutColor, 1.1)
-            ctx.lineWidth = Math.max(1, H * 0.0025)
-            ctx.save()
-            ctx.translate(0, -H * 0.003)
-            upper()
-            ctx.stroke()
-            ctx.restore()
-            ctx.strokeStyle = Qt.rgba(root.roadColor.r + (root.hazeColor.r - root.roadColor.r) * 0.2,
-                                      root.roadColor.g + (root.hazeColor.g - root.roadColor.g) * 0.2,
-                                      root.roadColor.b + (root.hazeColor.b - root.roadColor.b) * 0.2, 1)
-            ctx.lineWidth = Math.max(2, H * 0.0045)
-            upper()
-            ctx.stroke()
-
-            // A nearer hill stands to the left of the cut. Its right flank comes
-            // steeply down across the farther hill and the road's last stretch,
-            // so the road passes out of sight behind it. Being nearer, it is
-            // darker and less hazy than the hill behind.
-            var bend = curve(far0, far1, far2, far3, 0.86)
-            var y0 = H * root.horizon
-            // A modest rounded hill: it rises out of the valley on its left to a
-            // gentle top, then comes down steeply across the road's last stretch.
-            var crest = y0 - H * 0.155
-            var topX = bend.x - W * 0.11
-            var footLeft = bend.x - W * 0.34
-            var near = ctx.createLinearGradient(0, crest, 0, cy)
-            var nearTop = Qt.darker(root.hillColor, 1.12)
-            near.addColorStop(0, nearTop)
-            near.addColorStop(1, Qt.rgba(nearTop.r + (root.hazeColor.r - nearTop.r) * 0.25,
-                                         nearTop.g + (root.hazeColor.g - nearTop.g) * 0.25,
-                                         nearTop.b + (root.hazeColor.b - nearTop.b) * 0.25, 1))
-            function nearHillOutline() {
-                ctx.moveTo(footLeft, cy + 1)
-                // The long left slope up out of the valley.
-                ctx.bezierCurveTo(footLeft + W * 0.1, cy - H * 0.02, topX - W * 0.12, crest + H * 0.004, topX, crest)
-                // Over the top and down the steep right flank to the road's end.
-                ctx.bezierCurveTo(topX + W * 0.06, crest - H * 0.002,
-                                  bend.x - W * 0.012, bend.y - H * 0.045,
-                                  bend.x + W * 0.004, bend.y + H * 0.008)
-                // Its foot reaches the valley floor just beyond the road.
-                ctx.quadraticCurveTo(bend.x + W * 0.012, cy - H * 0.006, bend.x + W * 0.03, cy + 1)
-            }
-            ctx.fillStyle = near
-            ctx.beginPath()
-            nearHillOutline()
-            ctx.closePath()
-            ctx.fill()
-            // A faint line where the near hill's edge stands against the far one.
-            ctx.strokeStyle = Qt.darker(nearTop, 1.15)
-            ctx.lineWidth = Math.max(1, H * 0.0018)
-            ctx.beginPath()
-            nearHillOutline()
-            ctx.stroke()
-            // Ballast, then a rail catching what light there is on top of it.
-            line()
-            ctx.lineWidth = Math.max(2, H * 0.004)
-            ctx.strokeStyle = root.ballastColor
-            ctx.stroke()
-            line()
-            ctx.lineWidth = 1
-            ctx.strokeStyle = root.railColor
-            ctx.stroke()
-        }
+        coveredFrom: root.coveredFrom
+        horizon: root.horizon
+        crossingX: root.crossingX
+        floorColor: root.floorColor
+        ballastColor: root.ballastColor
+        railColor: root.railColor
+        roadColor: root.roadColor
+        cutColor: root.cutColor
+        fillColor: root.fillColor
+        hillColor: root.hillColor
+        hazeColor: root.hazeColor
     }
 
     // The train. Each vehicle is drawn once at full size, in metres, and only

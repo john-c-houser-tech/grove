@@ -1,4 +1,5 @@
 import QtQuick
+import Grove
 
 // The sky, stars, sun and moon, all from the garden's light. The ground
 // covers the bottom of this item, so a sinking sun slips behind it.
@@ -8,6 +9,9 @@ Item {
     // Where the horizon sits, as a fraction of the height.
     // At standing eye level: everything below is ground, everything above sky.
     property real horizon: 0.6
+    // Where the opaque ground in front begins, in pixels from the top. The land
+    // here is hidden below it, so it is not drawn there.
+    property real groundY: -1
 
     Rectangle {
         anchors.fill: parent
@@ -150,6 +154,7 @@ Item {
     Hills {
         part: "back"
         anchors.fill: parent
+        coveredFrom: root.groundY
         horizon: root.horizon
         snowline: look.snowline
         snowCover: look.snowCover
@@ -172,6 +177,7 @@ Item {
         id: train
         objectName: "train"
         anchors.fill: parent
+        coveredFrom: root.groundY
         horizon: root.horizon
         carColor: Qt.darker(look.midColor, 2.2)
         floorColor: look.floorColor
@@ -193,6 +199,7 @@ Item {
     Hills {
         part: "front"
         anchors.fill: parent
+        coveredFrom: root.groundY
         horizon: root.horizon
         hazeColor: light.skyBottom
         farColor: look.farColor
