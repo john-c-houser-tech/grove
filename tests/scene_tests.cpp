@@ -177,6 +177,16 @@ private slots:
             QVERIFY(grab().save(out + "/" + scene.name + ".png"));
             m_app.reset();
         }
+        // The night train, stopped at the crossing with its signal ringing.
+        App::Options night = baseOptions(25 * 60);
+        night.time = QTime(1, 0);
+        start(night);
+        QObject *train = find<QObject>("train");
+        QVERIFY(QMetaObject::invokeMethod(train, "show", Q_ARG(QVariant, 0.6)));
+        QTest::qWait(2500);
+        QVERIFY(grab().save(out + "/night-train.png"));
+        m_app.reset();
+
         start();
         for (int seed = 1; seed <= 6; ++seed)
             m_app->garden().record(plant(seed));

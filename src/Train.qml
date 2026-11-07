@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Grove
 
@@ -114,8 +115,8 @@ Item {
     // front of the train.
     readonly property var layout: {
         var out = [], x = width * headX
-        for (var i = 0; i < consist.length; i++) {
-            var unit = sizeAt(x / Math.max(1, width))
+        for (let i = 0; i < consist.length; i++) {
+            let unit = sizeAt(x / Math.max(1, width))
             out.push({ x: x, unit: unit })
             x += (consist[i].length + coupling) * metre * unit
         }
@@ -145,6 +146,7 @@ Item {
         model: root.consist.length
         delegate: Canvas {
             id: vehicle
+            required property int index
             readonly property var spec: root.consist[index]
             readonly property var slot: root.layout[index]
             readonly property int number: index
@@ -230,7 +232,7 @@ Item {
                     wheel(2.6); wheel(4.2); wheel(20.8); wheel(22.4)
                     // A coach body with a rounded roof.
                     ctx.fillStyle = body
-                    var r = 0.6
+                    let r = 0.6
                     ctx.beginPath()
                     ctx.moveTo(0, h - 1.15)
                     ctx.lineTo(0, h - (spec.tall - r))
@@ -243,7 +245,7 @@ Item {
                     // Windows down the side, a few of them dark, and the small
                     // windows in the doors at either end.
                     ctx.fillStyle = warm
-                    for (var w = 0; w < 10; w++) {
+                    for (let w = 0; w < 10; w++) {
                         ctx.globalAlpha = ((number * 7 + w * 3) % 5) === 0 ? 0.12 : 0.6
                         box(2.9 + w * 2.05, 2.3, 4.3 + w * 2.05, 3.25)
                     }
@@ -316,6 +318,7 @@ Item {
         Repeater {
             model: 2
             delegate: Rectangle {
+                required property int index
                 x: -width / 2
                 y: -4.15 * signal.m - height / 2
                 width: 2.7 * signal.m
@@ -335,6 +338,8 @@ Item {
         Repeater {
             model: 2
             delegate: Item {
+                id: lamp
+                required property int index
                 readonly property bool lit: signal.ringing && (index === 0) === signal.first
                 x: (index === 0 ? -0.62 : 0.62) * signal.m
                 y: -2.7 * signal.m
@@ -344,7 +349,7 @@ Item {
                     width: 3.4 * signal.m
                     height: width
                     color: "#ff3b2a"
-                    opacity: lit ? 0.95 * root.fade : 0
+                    opacity: lamp.lit ? 0.95 * root.fade : 0
                 }
                 // The lamp's black backing, and the lens on it.
                 Rectangle {
@@ -361,7 +366,7 @@ Item {
                     width: Math.max(1.5, 0.34 * signal.m)
                     height: width
                     radius: width / 2
-                    color: lit ? "#ff6a55" : Qt.lighter(root.carColor, 1.6)
+                    color: lamp.lit ? "#ff6a55" : Qt.lighter(root.carColor, 1.6)
                 }
             }
         }

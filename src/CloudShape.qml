@@ -62,47 +62,47 @@ Canvas {
 
         if (kind === 0) {
             // Cumulus: a lumpy heap with a flat-ish base and frayed ends.
-            var bottom = h * 0.8
-            var n = 10 + Math.floor(r() * 6)
-            for (var i = 0; i < n; i++) {
-                var t = (i + 0.5) / n
-                var profile = Math.sin(Math.PI * t)
-                var rad = h * (0.15 + 0.3 * profile * (0.5 + 0.5 * r()))
-                var x = w * (0.1 + 0.8 * t) + (r() - 0.5) * w * 0.05
+            let bottom = h * 0.8
+            let n = 10 + Math.floor(r() * 6)
+            for (let i = 0; i < n; i++) {
+                let t = (i + 0.5) / n
+                let profile = Math.sin(Math.PI * t)
+                let rad = h * (0.15 + 0.3 * profile * (0.5 + 0.5 * r()))
+                let x = w * (0.1 + 0.8 * t) + (r() - 0.5) * w * 0.05
                 puff(x, bottom - rad * (0.5 + 0.35 * r()), rad * 1.3, 1 + r() * 0.3, tone, 0.62)
             }
-            var tops = 3 + Math.floor(r() * 4)
-            for (var m = 0; m < tops; m++)
+            let tops = 3 + Math.floor(r() * 4)
+            for (let m = 0; m < tops; m++)
                 puff(w * (0.22 + 0.56 * r()), bottom - h * (0.3 + 0.25 * r()), h * (0.12 + 0.14 * r()), 1 + r() * 0.3, tone, 0.55)
             // The underside sits in shadow.
             puff(w * 0.5, bottom - h * 0.02, h * 0.2, w / (h * 0.2) * 0.42, shade, 0.4)
-            var frays = 5 + Math.floor(r() * 4)
-            for (var k = 0; k < frays; k++) {
-                var left = r() < 0.5
+            let frays = 5 + Math.floor(r() * 4)
+            for (let k = 0; k < frays; k++) {
+                let left = r() < 0.5
                 puff(w * (left ? 0.0 + 0.22 * r() : 0.78 + 0.22 * r()), bottom - h * (0.02 + 0.22 * r()),
                      h * (0.08 + 0.1 * r()), 3 + r() * 5, tone, 0.3)
             }
         } else if (kind === 1) {
             // Stratus: a long, low band with the edges trailing off in streaks.
-            var count = 8 + Math.floor(r() * 5)
-            for (var s = 0; s < count; s++) {
-                var ts = (s + 0.5) / count
+            let count = 8 + Math.floor(r() * 5)
+            for (let s = 0; s < count; s++) {
+                let ts = (s + 0.5) / count
                 puff(w * (0.08 + 0.84 * ts) + (r() - 0.5) * w * 0.05, h * (0.5 + (r() - 0.5) * 0.14),
                      h * (0.12 + 0.14 * r()), 2.5 + r() * 3, tone, 0.45)
             }
             puff(w * 0.5, h * 0.64, h * 0.16, w / (h * 0.16) * 0.4, shade, 0.28)
-            var streaks = 7 + Math.floor(r() * 4)
-            for (var q = 0; q < streaks; q++)
+            let streaks = 7 + Math.floor(r() * 4)
+            for (let q = 0; q < streaks; q++)
                 puff(w * (0.02 + 0.96 * r()), h * (0.3 + 0.5 * r()), h * (0.06 + 0.07 * r()), 5 + r() * 5, tone, 0.24)
         } else {
             // Cirrus: thin, hooked streaks with nothing solid in them.
-            var strokes = 6 + Math.floor(r() * 5)
-            for (var c = 0; c < strokes; c++) {
-                var x0 = w * (0.05 + 0.55 * r())
-                var y0 = h * (0.2 + 0.6 * r())
-                var bend = (r() - 0.5) * 0.5
-                var pieces = 3 + Math.floor(r() * 3)
-                for (var j = 0; j < pieces; j++)
+            let strokes = 6 + Math.floor(r() * 5)
+            for (let c = 0; c < strokes; c++) {
+                let x0 = w * (0.05 + 0.55 * r())
+                let y0 = h * (0.2 + 0.6 * r())
+                let bend = (r() - 0.5) * 0.5
+                let pieces = 3 + Math.floor(r() * 3)
+                for (let j = 0; j < pieces; j++)
                     puff(x0 + j * w * 0.09, y0 + j * j * h * 0.03 * bend, h * (0.06 + 0.05 * r()), 4 + r() * 4, tone, 0.26)
             }
         }

@@ -4,33 +4,10 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QQmlApplicationEngine>
-#include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QRandomGenerator>
 #include <QUrl>
-#include <QtQml/qqml.h>
-
-#include "field.h"
-#include "hills.h"
-#include "trackbed.h"
-
-namespace {
-
-// What every window in the process shares, set up once before the first is
-// loaded: the controls' style, and the landscape types, drawn in C++.
-void prepareQml() {
-    static const bool prepared = [] {
-        QQuickStyle::setStyle("Material");
-        qmlRegisterType<Hills>("Grove", 1, 0, "Hills");
-        qmlRegisterType<TrackBed>("Grove", 1, 0, "TrackBed");
-        qmlRegisterType<Field>("Grove", 1, 0, "Field");
-        return true;
-    }();
-    Q_UNUSED(prepared);
-}
-
-} // namespace
 
 App::Options App::fromEnvironment() {
     Options options;
@@ -129,18 +106,16 @@ void App::sessionChanged() {
 }
 
 bool App::load() {
-    prepareQml();
-    m_engine = std::make_unique<QQmlApplicationEngine>();
+    // The controls' style is the process's, and is fixed before the first
+    // window is loaded.
+    static const bool styled = [] {
+        QQuickStyle::setStyle("Material");
+        return true;
+    }();
+    Q_UNUSED(styled);
+    m_engine = std::make_unique<AppEngine>(this);
     QObject::connect(&m_translator, &Translator::changed, m_engine.get(), &QQmlEngine::retranslate);
-    QQmlContext *context = m_engine->rootContext();
-    context->setContextProperty("translator", &m_translator);
-    context->setContextProperty("theme", &m_theme);
-    context->setContextProperty("backend", &m_backend);
-    context->setContextProperty("light", &m_light);
-    context->setContextProperty("weather", &m_weather);
-    context->setContextProperty("sounds", &m_sounds);
-    context->setContextProperty("garden", &m_garden);
-    context->setContextProperty("notifier", &m_notifier);
+    // The objects reach QML as the Grove module's singletons (qmltypes.h).
     m_engine->load(QUrl("qrc:/Main.qml"));
     return window() != nullptr;
 }

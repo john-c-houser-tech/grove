@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -15,20 +16,24 @@ ApplicationWindow {
     color: "#0e1210"
 
     Material.theme: Material.Dark
-    Material.accent: theme.accent
-    Material.roundedScale: theme.radius
+    Material.accent: Theme.accent
+    // Material takes the corner radius in pixels through this enum-typed
+    // property, so a plain number is what it wants here.
+    // qmllint disable incompatible-type
+    Material.roundedScale: Theme.radius
+    // qmllint enable incompatible-type
 
     property bool helpVisible: false
     property bool gardenVisible: false
     property bool quitConfirmed: false
-    readonly property bool growing: backend.state === "growing"
+    readonly property bool growing: Backend.state === "growing"
     // Overcast, rain and fog dull the light on the plant and the ground.
-    readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.14 * weather.cloud + 0.14 * weather.rain + 0.14 * weather.snow + 0.28 * weather.fog))
+    readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.14 * Weather.cloud + 0.14 * Weather.rain + 0.14 * Weather.snow + 0.28 * Weather.fog))
 
     // Numbers take the language's digits and separators, and re-render when
     // the language changes.
     function number(n) {
-        var lang = translator.language
+        var lang = Translator.language
         return n.toLocaleString(Qt.locale(), 'f', 0)
     }
     function clock(seconds) {
@@ -61,7 +66,7 @@ ApplicationWindow {
         enabled: (win.helpVisible || win.gardenVisible) && !confirm.opened
         onActivated: { win.helpVisible = false; win.gardenVisible = false }
     }
-    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: sounds.muted = !sounds.muted }
+    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: Sounds.muted = !Sounds.muted }
     Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: win.quit() }
     Shortcut {
         sequence: "Space"
@@ -70,7 +75,7 @@ ApplicationWindow {
         onActivated: {
             // Giving up wilts the plant, so it is the one action that asks.
             if (win.growing) win.ask("giveup")
-            else backend.start()
+            else Backend.start()
         }
     }
 
@@ -78,7 +83,7 @@ ApplicationWindow {
     // application's layout direction.
     Item {
         anchors.fill: parent
-        LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
+        LayoutMirroring.enabled: Translator.rightToLeft
         LayoutMirroring.childrenInherit: true
 
         SkyBackdrop {
@@ -96,7 +101,7 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             // From where the field ends, out at 40 m, to the bottom.
             height: parent.height - field.farEdgeY
-            color: Qt.tint(Qt.tint(Qt.tint("#2a2018", win.weatherTint), light.nightTint), light.warmTint)
+            color: Qt.tint(Qt.tint(Qt.tint("#2a2018", win.weatherTint), Light.nightTint), Light.warmTint)
         }
 
         // The ploughed field the plant grows in.
@@ -106,9 +111,9 @@ ApplicationWindow {
             groundTop: farEdgeY
             part: "far"
             soilColor: ground.color
-            hazeColor: light.skyBottom
-            snow: weather.snow
-            frost: weather.season === "winter"
+            hazeColor: Light.skyBottom
+            snow: Weather.snow
+            frost: Weather.season === "winter"
         }
 
         GrowingPlant {
@@ -118,14 +123,14 @@ ApplicationWindow {
             // The trunk stands in the furrow the field puts it in.
             base: (field.plantBaseY - y) / height
             rootX: field.plantX
-            progress: weather.growth
-            seed: backend.seed
-            wilted: backend.state === "wilted"
-            flowerColor: theme.accent
-            nightTint: light.nightTint
-            warmTint: light.warmTint
+            progress: Weather.growth
+            seed: Backend.seed
+            wilted: Backend.state === "wilted"
+            flowerColor: Theme.accent
+            nightTint: Light.nightTint
+            warmTint: Light.warmTint
             weatherTint: win.weatherTint
-            season: weather.season
+            season: Weather.season
         }
 
         // The rows nearer than the plant, over its foot.
@@ -134,18 +139,18 @@ ApplicationWindow {
             part: "near"
             groundTop: farEdgeY
             soilColor: ground.color
-            hazeColor: light.skyBottom
-            snow: weather.snow
-            frost: weather.season === "winter"
+            hazeColor: Light.skyBottom
+            snow: Weather.snow
+            frost: Weather.season === "winter"
         }
 
         Precipitation {
             anchors.fill: parent
-            rain: weather.rain
-            snow: weather.snow
-            fog: weather.fog
-            sky: light.skyTop
-            ambient: light.ambient
+            rain: Weather.rain
+            snow: Weather.snow
+            fog: Weather.fog
+            sky: Light.skyTop
+            ambient: Light.ambient
         }
 
         // Small and quiet, so the scene comes first. It sits at the top right,
@@ -179,8 +184,8 @@ ApplicationWindow {
 
             Label {
                 Layout.alignment: heading.lineAlignment
-                text: backend.state === "idle" ? qsTr("%n minutes", "", backend.minutes)
-                    : win.clock(backend.state === "growing" ? backend.remaining : 0)
+                text: Backend.state === "idle" ? qsTr("%n minutes", "", Backend.minutes)
+                    : win.clock(Backend.state === "growing" ? Backend.remaining : 0)
                 font.pixelSize: 24
                 font.weight: Font.Light
                 opacity: 0.75
@@ -189,9 +194,9 @@ ApplicationWindow {
                 Layout.alignment: heading.lineAlignment
                 opacity: 0.5
                 font.pixelSize: 12
-                text: backend.state === "idle" ? qsTr("Press Space to plant a seed")
-                    : backend.state === "growing" ? qsTr("Growing. Stay with it.")
-                    : backend.state === "done" ? qsTr("Fully grown. Space plants another.")
+                text: Backend.state === "idle" ? qsTr("Press Space to plant a seed")
+                    : Backend.state === "growing" ? qsTr("Growing. Stay with it.")
+                    : Backend.state === "done" ? qsTr("Fully grown. Space plants another.")
                     : qsTr("It wilted. Space tries again.")
             }
         }
@@ -201,8 +206,8 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
             anchors.margins: 12
-            visible: sounds.problem !== "" || sounds.muted
-            text: sounds.problem !== "" ? sounds.problem : qsTr("Sounds are off. M turns them on.")
+            visible: Sounds.problem !== "" || Sounds.muted
+            text: Sounds.problem !== "" ? Sounds.problem : qsTr("Sounds are off. M turns them on.")
             opacity: 0.6
             font.pixelSize: 12
         }
@@ -224,8 +229,8 @@ ApplicationWindow {
             width: parent.width - 220
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
-            visible: garden.problem !== "" || notifier.problem !== ""
-            text: garden.problem !== "" ? garden.problem : notifier.problem
+            visible: Garden.problem !== "" || Notifier.problem !== ""
+            text: Garden.problem !== "" ? Garden.problem : Notifier.problem
             color: "#ffb4a8"
             font.pixelSize: 12
         }
@@ -249,9 +254,9 @@ ApplicationWindow {
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 48, 360)
                 height: keys.implicitHeight + 48
-                radius: theme.radius
+                radius: Theme.radius
                 color: "#1a211d"
-                border.color: theme.accent
+                border.color: Theme.accent
                 border.width: 1
                 ColumnLayout {
                     id: keys
@@ -268,9 +273,11 @@ ApplicationWindow {
                             { k: "Q", d: qsTr("Quit") }
                         ]
                         delegate: RowLayout {
+                            id: key
+                            required property var modelData
                             Layout.fillWidth: true
-                            Label { text: modelData.k; color: theme.accent; Layout.preferredWidth: 70 }
-                            Label { text: modelData.d; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                            Label { text: key.modelData.k; color: Theme.accent; Layout.preferredWidth: 70 }
+                            Label { text: key.modelData.d; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                         }
                     }
                 }
@@ -296,11 +303,11 @@ ApplicationWindow {
         onAccepted: {
             if (action === "quit") {
                 // Leaving mid-session wilts the plant, and the garden keeps it.
-                backend.giveUp()
+                Backend.giveUp()
                 win.quitConfirmed = true
                 Qt.quit()
             } else {
-                backend.giveUp()
+                Backend.giveUp()
             }
         }
     }

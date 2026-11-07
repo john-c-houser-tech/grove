@@ -8,6 +8,13 @@ INCLUDEPATH += $$PWD
 # compiler.
 QMAKE_CXXFLAGS += -Wpedantic -Wshadow
 
+# The C++ types QML uses form the Grove module. qmltyperegistrar registers
+# them, and writes <target>.qmltypes, which bin/lint gives qmllint so it knows
+# every type and property the QML refers to.
+CONFIG += qmltypes
+QML_IMPORT_NAME = Grove
+QML_IMPORT_MAJOR_VERSION = 1
+
 HEADERS += \
     $$PWD/app.h \
     $$PWD/backend.h \
@@ -19,6 +26,7 @@ HEADERS += \
     $$PWD/light.h \
     $$PWD/notifier.h \
     $$PWD/problem.h \
+    $$PWD/qmltypes.h \
     $$PWD/sounds.h \
     $$PWD/terrain.h \
     $$PWD/theme.h \

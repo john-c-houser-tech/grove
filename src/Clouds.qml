@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 
 // Soft clouds drifting across the sky. More of them appear as the cover
@@ -45,6 +46,7 @@ Item {
         model: 9
         delegate: CloudShape {
             id: cloud
+            required property int index
             // Deterministic scatter, so the sky has the same clouds each time.
             readonly property real a: Math.abs(Math.sin(index * 91.7 + 1.3))
             readonly property real b: Math.abs(Math.sin(index * 47.1 + 2.9))

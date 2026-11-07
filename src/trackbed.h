@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QtQml/qqmlregistration.h>
 
 #include "layer.h"
 
@@ -9,6 +10,7 @@
 // cover the floor's lower part; the train runs between this and them.
 class TrackBed : public PaintedLayer {
     Q_OBJECT
+    QML_ELEMENT
     // Where the horizon sits, as a fraction of the height.
     Q_PROPERTY(double horizon MEMBER m_horizon NOTIFY changed)
     // Where the crossing stands, as a fraction of the width.

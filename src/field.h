@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QtQml/qqmlregistration.h>
 
 #include "layer.h"
 
@@ -15,6 +16,7 @@
 // and the trunk agree.
 class Field : public PaintedLayer {
     Q_OBJECT
+    QML_ELEMENT
     // The horizon, as a fraction of the height, and where the field's far edge
     // meets the meadow, in pixels from the top (by default, near the bottom).
     Q_PROPERTY(double horizon READ horizon WRITE setHorizon NOTIFY changed)

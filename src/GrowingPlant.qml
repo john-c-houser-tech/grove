@@ -90,8 +90,8 @@ Canvas {
             var ey = y + Math.sin(angle) * length
             var leaves = []
             if (depth >= 2) {
-                var count = 1 + Math.floor(r() * 2)
-                for (var i = 0; i < count; i++)
+                let count = 1 + Math.floor(r() * 2)
+                for (let i = 0; i < count; i++)
                     leaves.push({ f: 0.35 + r() * 0.6, side: r() < 0.5 ? -1 : 1, size: 0.75 + r() * 0.5, tone: r() })
             }
             // No stem grows dead straight: each one bows a little to one side,
@@ -113,9 +113,9 @@ Canvas {
                 return
             }
             var n = depth === 0 ? 3 : (r() < 0.7 ? 2 : 3)
-            for (var k = 0; k < n; k++) {
-                var turn = (k - (n - 1) / 2) * 0.62 + (r() - 0.5) * 0.35
-                var shrink = 0.68 + r() * 0.1
+            for (let k = 0; k < n; k++) {
+                let turn = (k - (n - 1) / 2) * 0.62 + (r() - 0.5) * 0.35
+                let shrink = 0.68 + r() * 0.1
                 grow(ex, ey, angle + turn, length * shrink, depth + 1, t1)
             }
         }
@@ -155,8 +155,8 @@ Canvas {
     }
 
     function drawFlower(ctx, x, y, size) {
-        for (var i = 0; i < 5; i++) {
-            var a = i * Math.PI * 2 / 5
+        for (let i = 0; i < 5; i++) {
+            let a = i * Math.PI * 2 / 5
             ctx.beginPath()
             ctx.arc(x + Math.cos(a) * size * 0.55, y + Math.sin(a) * size * 0.55, size * 0.5, 0, Math.PI * 2)
             ctx.fillStyle = lit(flowerColor)
@@ -186,18 +186,18 @@ Canvas {
         if (progress <= 0)
             return
 
-        for (var i = 0; i < segments.length; i++) {
-            var s = segments[i]
-            var p = clamp((progress - s.t0) / (s.t1 - s.t0))
+        for (let i = 0; i < segments.length; i++) {
+            let s = segments[i]
+            let p = clamp((progress - s.t0) / (s.t1 - s.t0))
             if (p <= 0)
                 continue
             // The stem as far as it has grown, in short pieces so a tapering one
             // can thin as it goes; round ends hide the joins.
-            var pieces = s.tipWidth < s.width ? 6 : 3
+            let pieces = s.tipWidth < s.width ? 6 : 3
             ctx.strokeStyle = stem
-            for (var k = 0; k < pieces; k++) {
-                var ta = p * k / pieces, tb = p * (k + 1) / pieces
-                var a = along(s, ta), b = along(s, tb)
+            for (let k = 0; k < pieces; k++) {
+                let ta = p * k / pieces, tb = p * (k + 1) / pieces
+                let a = along(s, ta), b = along(s, tb)
                 ctx.beginPath()
                 ctx.moveTo(a.x, a.y)
                 ctx.lineTo(b.x, b.y)
@@ -209,31 +209,31 @@ Canvas {
                 ctx.strokeStyle = lit("#e6f1f4")
                 ctx.lineWidth = Math.max(1, s.width * 0.3)
                 ctx.beginPath()
-                for (var fk = 0; fk <= pieces; fk++) {
-                    var fp = along(s, p * fk / pieces)
+                for (let fk = 0; fk <= pieces; fk++) {
+                    let fp = along(s, p * fk / pieces)
                     fk === 0 ? ctx.moveTo(fp.x, fp.y - s.width * 0.25) : ctx.lineTo(fp.x, fp.y - s.width * 0.25)
                 }
                 ctx.stroke()
             }
 
-            for (var j = 0; j < s.leaves.length; j++) {
-                var l = s.leaves[j]
+            for (let j = 0; j < s.leaves.length; j++) {
+                let l = s.leaves[j]
                 // Winter strips most of the leaves.
                 if (season === "winter" && !wilted && l.tone > 0.3)
                     continue
-                var grown = clamp((p - l.f) * 4)
+                let grown = clamp((p - l.f) * 4)
                 if (grown <= 0)
                     continue
-                var at = along(s, l.f)
-                var tilt = wilted ? 1.5 : 0.9
+                let at = along(s, l.f)
+                let tilt = wilted ? 1.5 : 0.9
                 drawLeaf(ctx, at.x, at.y, headingAt(s, l.f) + l.side * tilt, height * 0.035 * l.size * grown * leafScale, wilted ? wiltedLeaf : lit(leafColor(l.tone)))
             }
         }
 
         if (!wilted) {
-            var bloom = clamp((progress - 0.9) / 0.1)
+            let bloom = clamp((progress - 0.9) / 0.1)
             if (bloom > 0)
-                for (var t = 0; t < tips.length; t++)
+                for (let t = 0; t < tips.length; t++)
                     drawFlower(ctx, tips[t].x, tips[t].y, height * 0.026 * tips[t].size * bloom)
         }
     }

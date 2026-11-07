@@ -1,6 +1,6 @@
 #!/bin/sh
 # Every static check, any finding fails: the formatting, the compiler's
-# warnings, clang-tidy, and the translation catalogs. The memory checks are in
+# warnings, clang-tidy, qmllint, and the translation catalogs. The memory checks are in
 # bin/check-leaks, the tests in bin/test, and bin/check runs all three.
 set -eu
 
@@ -26,8 +26,17 @@ includes=$(sed -n 's/^INCPATH *= *//p' Makefile)
 # shellcheck disable=SC2086
 clang-tidy --quiet "$ROOT"/src/*.cpp -- -std=c++17 -fPIC $defines $includes
 
-echo "translation catalogs"
+echo "qmllint (the QML, against the Grove module this build describes)"
+# The build writes grove.qmltypes, the C++ types and singletons QML can use;
+# a qmldir beside it makes it a module qmllint can import.
+mkdir -p qmlmodules/Grove
+cp grove.qmltypes qmlmodules/Grove/
+printf 'module Grove\ntypeinfo grove.qmltypes\ndepends QtQuick\n' >qmlmodules/Grove/qmldir
+# From the root: qmllint also reads any .qmltypes in its working directory.
 cd "$ROOT"
+"$(qmake6 -query QT_HOST_BINS)/qmllint" --max-warnings 0 -I build/lint/qmlmodules src/*.qml
+
+echo "translation catalogs"
 bin/check-i18n
 
 echo "lint passed"

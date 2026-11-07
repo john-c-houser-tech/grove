@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Particles
 
@@ -29,11 +30,11 @@ Item {
     readonly property color flakeColor: root.ambient > 0.5 ? "#ffffff" : "#c9d6ee"
 
     ParticleSystem {
-        id: system
+        id: rainSystem
         running: root.rain > 0.02
     }
     Emitter {
-        system: system
+        system: rainSystem
         x: -80
         y: -30
         width: root.width + 160
@@ -48,7 +49,7 @@ Item {
     // Image particles are drawn together by the GPU; an item per drop would be
     // hundreds of items alive at once, each one laid out and drawn on its own.
     ImageParticle {
-        system: system
+        system: rainSystem
         source: "images/rain.png"
         rotation: 8
         color: root.premultiplied(root.dropColor, 0.45)
@@ -66,9 +67,11 @@ Item {
     Repeater {
         model: [{ group: "faint", alpha: 0.5 }, { group: "middling", alpha: 0.7 }, { group: "bright", alpha: 0.9 }]
         delegate: Item {
+            id: flakes
+            required property var modelData
             Emitter {
                 system: snowSystem
-                group: modelData.group
+                group: flakes.modelData.group
                 x: -40
                 y: -20
                 width: root.width + 80
@@ -83,15 +86,15 @@ Item {
             }
             ImageParticle {
                 system: snowSystem
-                groups: [modelData.group]
+                groups: [flakes.modelData.group]
                 source: "images/snow.png"
                 // A round flake looks the same turned any way, but turning puts it
                 // on Qt's quad path. The plainer path sizes particles by the
                 // screen's whole-number scale rather than the window's, so at 125%
                 // every flake came out 1.6 times too big.
                 autoRotation: true
-                color: root.premultiplied(root.flakeColor, modelData.alpha)
-                alpha: modelData.alpha
+                color: root.premultiplied(root.flakeColor, flakes.modelData.alpha)
+                alpha: flakes.modelData.alpha
             }
         }
     }
@@ -106,9 +109,9 @@ Item {
         anchors.fill: parent
         opacity: root.fog
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.18) }
-            GradientStop { position: 0.6; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.5) }
-            GradientStop { position: 1.0; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.7) }
+            GradientStop { position: 0.0; color: Qt.alpha(root.fogColor, 0.18) }
+            GradientStop { position: 0.6; color: Qt.alpha(root.fogColor, 0.5) }
+            GradientStop { position: 1.0; color: Qt.alpha(root.fogColor, 0.7) }
         }
     }
 
@@ -125,6 +128,7 @@ Item {
         model: 5
         // Stratus bands from the cloud painter, so the fog has no hard edges.
         delegate: CloudShape {
+            required property int index
             readonly property real a: Math.abs(Math.sin(index * 31.9 + 0.7))
             readonly property real w: root.width * (0.6 + 0.4 * a)
             // Seeds 1, 4, 7... are the long, low stratus kind.

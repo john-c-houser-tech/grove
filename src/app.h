@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDate>
+#include <QQmlApplicationEngine>
 #include <QString>
 #include <QTime>
 #include <memory>
@@ -14,8 +15,19 @@
 #include "translator.h"
 #include "weather.h"
 
-class QQmlApplicationEngine;
 class QQuickWindow;
+class App;
+
+// The QML engine of an App. The Grove module's singletons (qmltypes.h) are
+// made by the engine, and find the App whose objects they are through it.
+class AppEngine : public QQmlApplicationEngine {
+public:
+    explicit AppEngine(App *app) : m_app(app) {}
+    App &app() const { return *m_app; }
+
+private:
+    App *m_app;
+};
 
 // Everything the window runs on, made and wired together in one place, so the
 // app and its scene tests build the very same thing. The QML engine is made
@@ -63,7 +75,11 @@ public:
 
     Backend &backend() { return m_backend; }
     Garden &garden() { return m_garden; }
+    Light &light() { return m_light; }
+    Notifier &notifier() { return m_notifier; }
     Sounds &sounds() { return m_sounds; }
+    Theme &theme() { return m_theme; }
+    Translator &translator() { return m_translator; }
     Weather &weather() { return m_weather; }
 
 private:
@@ -79,5 +95,5 @@ private:
     Sounds m_sounds;
     Notifier m_notifier;
     Garden m_garden;
-    std::unique_ptr<QQmlApplicationEngine> m_engine;
+    std::unique_ptr<AppEngine> m_engine;
 };

@@ -16,6 +16,8 @@
 class Translator : public QTranslator {
     Q_OBJECT
     Q_PROPERTY(QString language READ languageCode NOTIFY changed)
+    // Whether the language reads right to left, so the window mirrors.
+    Q_PROPERTY(bool rightToLeft READ rightToLeft NOTIFY changed)
 
 public:
     explicit Translator(const QString &languageFile = {}, QString catalogDirectory = ":/i18n",
@@ -24,6 +26,7 @@ public:
     // The Omarchy language code ("en", "pt-BR"). Not QTranslator::language(),
     // which names the language of a compiled .qm catalog.
     QString languageCode() const { return m_language; }
+    bool rightToLeft() const { return m_rightToLeft; }
     bool isEmpty() const override { return m_strings.isEmpty(); }
     QString translate(const char *context, const char *sourceText, const char *disambiguation = nullptr,
                       int n = -1) const override;
@@ -41,6 +44,7 @@ private:
     QString m_languageFile;
     QString m_catalogDirectory;
     QString m_language;
+    bool m_rightToLeft = false;
     QHash<QString, QJsonValue> m_strings;
     QFileSystemWatcher m_watcher;
     QTimer m_debounce;

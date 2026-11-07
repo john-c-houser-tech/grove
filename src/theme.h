@@ -11,7 +11,8 @@ class Theme : public QObject {
     Q_DISABLE_COPY_MOVE(Theme)
     Q_PROPERTY(QString accent READ accent NOTIFY changed)
     Q_PROPERTY(QString accentForeground READ accentForeground NOTIFY changed)
-    Q_PROPERTY(int radius READ radius NOTIFY changed)
+    // The corner radius, in pixels, as Hyprland rounds windows.
+    Q_PROPERTY(double radius READ radius NOTIFY changed)
 
 public:
     explicit Theme(const QString &currentDirectory = {}, QObject *parent = nullptr, const QString &hyprctl = {});
@@ -19,7 +20,7 @@ public:
 
     QString accent() const { return m_accent; }
     QString accentForeground() const;
-    int radius() const { return m_radius; }
+    double radius() const { return m_radius; }
 
     static QString readAccent(const QString &path);
 

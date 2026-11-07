@@ -1,4 +1,5 @@
 import QtQuick
+import Grove
 
 // A small plane crossing the sky far away, in step with the faint drone you
 // hear: it is overhead at the middle of the flight, which is when the sound
@@ -70,7 +71,7 @@ Item {
         // A plane seen from the side, drawn nose to the right and mirrored when it flies left.
         transform: Scale { origin.x: 17; xScale: root.direction }
         // Fade in and out at the edges of the sky, and fade behind thick cloud.
-        opacity: Math.min(1, root.progress / 0.06, (1 - root.progress) / 0.06) * (1 - 0.6 * weather.cloud) * 0.9
+        opacity: Math.min(1, root.progress / 0.06, (1 - root.progress) / 0.06) * (1 - 0.6 * Weather.cloud) * 0.9
 
         // A canvas that starts hidden needs asking to paint once it is shown.
         onVisibleChanged: if (visible) requestPaint()

@@ -142,6 +142,7 @@ void Translator::reload() {
     // too, and right-to-left languages mirror the window.
     const QLocale locale = formatLocale(language);
     QLocale::setDefault(locale);
+    m_rightToLeft = locale.textDirection() == Qt::RightToLeft;
     QGuiApplication::setLayoutDirection(locale.textDirection());
     emit changed();
 }

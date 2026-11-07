@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QtQml/qqmlregistration.h>
 
 #include "layer.h"
 
@@ -10,6 +11,7 @@
 // farther away it is, fading toward the colour of the sky at the horizon.
 class Hills : public PaintedLayer {
     Q_OBJECT
+    QML_ELEMENT
     // Where the horizon sits, as a fraction of the height.
     Q_PROPERTY(double horizon MEMBER m_horizon NOTIFY changed)
     // "back" draws the peaks and ridges, "front" the hillside nearest to us, so

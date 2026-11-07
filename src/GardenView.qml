@@ -1,4 +1,6 @@
+pragma ComponentBehavior: Bound
 import QtQuick
+import Grove
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
@@ -23,11 +25,11 @@ Rectangle {
     }
     // Dates and numbers take the language's format, and re-render on a switch.
     function dateText(when) {
-        var lang = translator.language
+        var lang = Translator.language
         return when.toLocaleDateString(Qt.locale(), Locale.ShortFormat)
     }
     function number(n) {
-        var lang = translator.language
+        var lang = Translator.language
         return n.toLocaleString(Qt.locale(), 'f', 0)
     }
 
@@ -44,8 +46,8 @@ Rectangle {
             Label { text: qsTr("Garden"); font.pixelSize: 28; font.weight: Font.Light }
             Label {
                 opacity: 0.6
-                text: qsTr("%1 grown · %2 wilted · %3").arg(root.number(garden.grown)).arg(root.number(garden.wilted))
-                          .arg(qsTr("%n minutes", "", garden.focusedMinutes))
+                text: qsTr("%1 grown · %2 wilted · %3").arg(root.number(Garden.grown)).arg(root.number(Garden.wilted))
+                          .arg(qsTr("%n minutes", "", Garden.focusedMinutes))
             }
         }
 
@@ -66,7 +68,7 @@ Rectangle {
             Layout.fillHeight: true
             visible: count > 0
             clip: true
-            model: garden
+            model: Garden
             // It is made each time the garden opens, and takes the keys then.
             Component.onCompleted: forceActiveFocus()
             keyNavigationEnabled: true
@@ -79,16 +81,23 @@ Rectangle {
 
             delegate: Item {
                 id: tile
+                // The garden's roles, one per plant.
+                required property int seed
+                required property string outcome
+                required property string season
+                required property string weather
+                required property real progress
+                required property date when
                 width: grid.cellWidth
                 height: grid.cellHeight
 
                 Rectangle {
                     anchors.fill: parent
                     anchors.margins: 6
-                    radius: theme.radius
+                    radius: Theme.radius
                     color: "#161d19"
                     // The view sets isCurrentItem on the delegate itself, not on what is inside it.
-                    border.color: tile.GridView.isCurrentItem && grid.activeFocus ? theme.accent : "#222c26"
+                    border.color: tile.GridView.isCurrentItem && grid.activeFocus ? Theme.accent : "#222c26"
                     border.width: 1
 
                     Rectangle {
@@ -97,7 +106,7 @@ Rectangle {
                         anchors.right: parent.right
                         anchors.bottom: caption.top
                         height: 8
-                        color: model.season === "winter" ? "#cfdde0" : "#2a2018"
+                        color: tile.season === "winter" ? "#cfdde0" : "#2a2018"
                     }
 
                     GrowingPlant {
@@ -107,11 +116,11 @@ Rectangle {
                         anchors.bottom: caption.top
                         // The trunk goes into the middle of the strip of soil.
                         base: (height - soil.height / 2) / height
-                        progress: model.progress
-                        seed: model.seed
-                        wilted: model.outcome === "wilted"
-                        season: model.season
-                        flowerColor: theme.accent
+                        progress: tile.progress
+                        seed: tile.seed
+                        wilted: tile.outcome === "wilted"
+                        season: tile.season
+                        flowerColor: Theme.accent
                     }
 
                     ColumnLayout {
@@ -126,7 +135,7 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             font.pixelSize: 12
                             elide: Text.ElideRight
-                            text: root.dateText(model.when)
+                            text: root.dateText(tile.when)
                         }
                         Label {
                             Layout.fillWidth: true
@@ -134,7 +143,7 @@ Rectangle {
                             font.pixelSize: 11
                             opacity: 0.5
                             elide: Text.ElideRight
-                            text: model.outcome === "wilted" ? qsTr("Wilted") : root.weatherLabel(model.weather)
+                            text: tile.outcome === "wilted" ? qsTr("Wilted") : root.weatherLabel(tile.weather)
                         }
                     }
                 }
