@@ -73,7 +73,7 @@ Item {
         }
     }
 
-    // Moon: a crescent cut out of a disc, so it needs no matching sky colour.
+    // Moon: the whole disk, with the sunlit part a crescent.
     Item {
         visible: !light.sunUp
         readonly property real size: Math.min(root.width, root.height) * 0.055
@@ -82,28 +82,32 @@ Item {
         width: size
         height: size
         opacity: Math.min(1, 0.25 + light.stars) * Math.max(0.05, 1 - 0.7 * weather.cloud - 0.5 * weather.fog)
-        Rectangle {
-            anchors.centerIn: parent
-            width: parent.width * 2
-            height: width
-            radius: width / 2
-            color: "#dfe8ff"
-            opacity: 0.05
-        }
+        // The whole disk is there, faintly lit by earthshine; only the
+        // crescent catches the sun.
         Canvas {
+            id: moonDisk
             anchors.fill: parent
+            readonly property color shadow: Qt.tint(light.skyTop, Qt.rgba(0.8, 0.85, 1, 0.13))
+            onShadowChanged: requestPaint()
             onWidthChanged: requestPaint()
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
                 var r = width / 2
+                // The lit crescent: a bright disk with an offset disk cut out of it.
                 ctx.fillStyle = "#eef2ff"
                 ctx.beginPath()
                 ctx.arc(r, r, r, 0, Math.PI * 2)
                 ctx.fill()
                 ctx.globalCompositeOperation = "destination-out"
                 ctx.beginPath()
-                ctx.arc(r * 1.55, r * 0.85, r * 0.92, 0, Math.PI * 2)
+                ctx.arc(r * 1.5, r, r, 0, Math.PI * 2)
+                ctx.fill()
+                // The rest of the disk, behind the crescent.
+                ctx.globalCompositeOperation = "destination-over"
+                ctx.fillStyle = shadow
+                ctx.beginPath()
+                ctx.arc(r, r, r, 0, Math.PI * 2)
                 ctx.fill()
             }
         }

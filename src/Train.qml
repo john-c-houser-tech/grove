@@ -26,15 +26,29 @@ Item {
     readonly property real crossingX: 0.63
     readonly property real seconds: progress * totalMilliseconds / 1000
     readonly property real atCrossing: 26
-    readonly property int carCount: 11
-    // The train is 0.2 of the width long, and runs fast enough for its last
-    // car to be behind the left hill before the sound ends.
-    readonly property real trainLength: 0.2
+    // Everything on the railway is drawn to one scale, in metres, so the train
+    // and the signal agree: a metre is this many pixels at the crossing.
+    readonly property real metre: height * 0.007
+    // A diesel at the front and three coaches, with a coupling's gap between.
+    readonly property var consist: [
+        { kind: "diesel", length: 17, tall: 4.75 },
+        { kind: "coach", length: 25, tall: 4.4 },
+        { kind: "coach", length: 25, tall: 4.4 },
+        { kind: "coach", length: 25, tall: 4.4 }
+    ]
+    readonly property real coupling: 0.6
+    readonly property real lengthMetres: 17 + 3 * 25 + 3 * coupling
+    // The train's length as a fraction of the width, and a speed that gets
+    // its last coach behind the left hill before the sound ends.
+    readonly property real trainLength: lengthMetres * metre / Math.max(1, width)
     readonly property real speed: (crossingX + trainLength) / 16.5
-    // Where the front of the train is, as a fraction of the width.
+    // Where the front of the train is, as a fraction of the width. It runs
+    // right to left.
     readonly property real headX: crossingX - speed * (seconds - atCrossing)
     // Lights come up and go down gently at either end.
     readonly property real fade: Math.max(0, Math.min(1, seconds / 3, (totalMilliseconds / 1000 - seconds) / 3))
+    // The diesel's ditch lights flash while its horn sounds for the crossing.
+    readonly property bool horning: (seconds >= 3 && seconds <= 12) || (seconds >= 16 && seconds <= 26.5)
 
     NumberAnimation {
         id: run
@@ -60,16 +74,26 @@ Item {
         running = true
     }
 
-    // The track bends toward the viewer at the crossing and away on either
-    // side, so the train swells a little as it arrives and shrinks as it goes.
+    // The track bends a little toward the viewer at the crossing, so things
+    // there are slightly larger than they are farther along.
     function nearness(x) {
         var d = (x - crossingX) / 0.3
         return Math.exp(-d * d)
     }
-    function sizeAt(x) { return 0.65 + 0.5 * nearness(x) }
+    function sizeAt(x) { return 0.88 + 0.12 * nearness(x) }
     function trackY(x) { return height * (horizon - 0.085) + height * 0.014 * nearness(x) }
-    readonly property real carLength: height * 0.024
-    readonly property real carHeight: height * 0.012
+
+    // Where each vehicle's front end is, in pixels, laid end to end from the
+    // front of the train.
+    readonly property var layout: {
+        var out = [], x = width * headX
+        for (var i = 0; i < consist.length; i++) {
+            var unit = sizeAt(x / Math.max(1, width))
+            out.push({ x: x, unit: unit })
+            x += (consist[i].length + coupling) * metre * unit
+        }
+        return out
+    }
 
     // The valley floor, with the track along its far edge. The hills in front
     // cover its lower part.
@@ -129,32 +153,32 @@ Item {
         }
     }
 
-    // The level crossing: a post with a crossbuck, and two red lamps on an arm
-    // that flash in turn while the bells ring and are dark otherwise.
+    // The level crossing, to the same scale as the train: a post with a
+    // crossbuck, and two red lamps on an arm that flash in turn while the
+    // bells ring and are dark otherwise.
     Item {
         id: signal
         readonly property bool ringing: root.running && root.seconds >= 12.5 && root.seconds <= 34
         readonly property bool first: Math.floor((root.seconds - 12.5) / 0.62) % 2 === 0
-        readonly property real unit: root.sizeAt(root.crossingX)
-        readonly property real post: root.height * 0.044 * unit
+        readonly property real m: root.metre * root.sizeAt(root.crossingX)
         x: root.width * root.crossingX
         y: root.trackY(root.crossingX)
 
         Rectangle {
             x: -width / 2
-            y: -signal.post
-            width: Math.max(1, root.height * 0.0022 * signal.unit)
-            height: signal.post
+            y: -4.6 * signal.m
+            width: Math.max(1, 0.2 * signal.m)
+            height: 4.6 * signal.m
             color: root.carColor
         }
-        // The crossbuck: two boards crossed at the top of the post.
+        // The crossbuck: two boards crossed near the top of the post.
         Repeater {
             model: 2
             delegate: Rectangle {
                 x: -width / 2
-                y: -signal.post * 0.94 - height / 2
-                width: root.height * 0.02 * signal.unit
-                height: Math.max(1, root.height * 0.0024 * signal.unit)
+                y: -4.15 * signal.m - height / 2
+                width: 2.7 * signal.m
+                height: Math.max(1, 0.24 * signal.m)
                 rotation: index === 0 ? 35 : -35
                 color: root.carColor
             }
@@ -162,106 +186,196 @@ Item {
         // The arm the lamps hang from.
         Rectangle {
             x: -width / 2
-            y: -signal.post * 0.62
-            width: root.height * 0.017 * signal.unit
-            height: Math.max(1, root.height * 0.0016 * signal.unit)
+            y: -3.0 * signal.m
+            width: 1.7 * signal.m
+            height: Math.max(1, 0.16 * signal.m)
             color: root.carColor
         }
         Repeater {
             model: 2
             delegate: Item {
                 readonly property bool lit: signal.ringing && (index === 0) === signal.first
-                x: (index === 0 ? -1 : 1) * root.height * 0.007 * signal.unit
-                y: -signal.post * 0.62 + root.height * 0.003 * signal.unit
+                x: (index === 0 ? -0.62 : 0.62) * signal.m
+                y: -2.7 * signal.m
                 SoftGlow {
                     x: -width / 2
                     y: -height / 2
-                    width: root.height * 0.05 * signal.unit
+                    width: 3.4 * signal.m
                     height: width
                     color: "#ff3b2a"
                     opacity: lit ? 0.95 * root.fade : 0
                 }
+                // The lamp's black backing, and the lens on it.
                 Rectangle {
                     x: -width / 2
                     y: -height / 2
-                    width: Math.max(2, root.height * 0.004 * signal.unit)
+                    width: Math.max(2, 0.6 * signal.m)
                     height: width
                     radius: width / 2
-                    color: lit ? "#ff6a55" : root.carColor
+                    color: root.carColor
+                }
+                Rectangle {
+                    x: -width / 2
+                    y: -height / 2
+                    width: Math.max(1.5, 0.34 * signal.m)
+                    height: width
+                    radius: width / 2
+                    color: lit ? "#ff6a55" : Qt.lighter(root.carColor, 1.6)
                 }
             }
         }
     }
 
-    // The cars, the front one first and on the left, since the train runs
-    // from right to left.
+    // The train. Each vehicle is drawn once at full size, in metres, and only
+    // moved and scaled as it runs.
     Repeater {
-        model: root.carCount
-        delegate: Item {
-            readonly property real at: root.headX + index * root.trainLength / root.carCount
-            readonly property real unit: root.sizeAt(at)
-            visible: root.running && at > -0.03 && at < 1.03
-            x: root.width * at - width / 2
-            y: root.trackY(at) - height
-            width: root.carLength * unit
-            height: root.carHeight * unit * (index === 0 ? 1.25 : 1)
+        model: root.consist.length
+        delegate: Canvas {
+            id: vehicle
+            readonly property var spec: root.consist[index]
+            readonly property var slot: root.layout[index]
+            readonly property int number: index
+            width: spec.length * root.metre
+            height: spec.tall * root.metre
+            transformOrigin: Item.BottomLeft
+            scale: slot.unit
+            x: slot.x
+            y: root.trackY((slot.x + width * slot.unit / 2) / Math.max(1, root.width)) - height
+            visible: root.running && slot.x < root.width + 10 && slot.x + width * slot.unit > -10
             opacity: root.fade
 
-            Rectangle {
-                anchors.fill: parent
-                radius: Math.min(2, parent.height / 3)
-                color: root.carColor
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            Connections {
+                target: root
+                function onCarColorChanged() { vehicle.requestPaint() }
             }
-            // A row of dim windows down the side, a few of them dark, which is
-            // how a train reads from far off at night.
-            Repeater {
-                model: index === 0 ? 0 : 3
-                delegate: Rectangle {
-                    readonly property int window: model.index
-                    x: parent.width * (0.14 + window * 0.3)
-                    y: parent.height * 0.28
-                    width: parent.width * 0.16
-                    height: parent.height * 0.3
-                    color: "#ffcf7a"
-                    opacity: ((index * 7 + window * 3) % 5) === 0 ? 0.1 : 0.55
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                var m = root.metre
+                if (m <= 0)
+                    return
+                var h = spec.tall
+                ctx.scale(m, m)
+                // Drawing in metres, with heights measured up from the rail.
+                function box(x0, y0, x1, y1) { ctx.fillRect(x0, h - y1, x1 - x0, y1 - y0) }
+                function wheel(cx) {
+                    ctx.beginPath()
+                    ctx.arc(cx, h - 0.5, 0.48, 0, Math.PI * 2)
+                    ctx.fill()
                 }
-            }
-            // A lit window in the cab of the front unit, at its leading end.
-            Rectangle {
-                visible: index === 0
-                x: parent.width * 0.22
-                y: parent.height * 0.22
-                width: parent.width * 0.16
-                height: parent.height * 0.3
-                color: "#ffd98a"
-                opacity: 0.9
+                var body = root.carColor
+                var under = Qt.darker(root.carColor, 1.4)
+                var warm = "#ffcf7a"
+
+                if (spec.kind === "diesel") {
+                    // Trucks with two axles each, and the fuel tank between them.
+                    ctx.fillStyle = under
+                    box(2.4, 0.5, 5.6, 1.2)
+                    box(11.4, 0.5, 14.6, 1.2)
+                    wheel(3.2); wheel(4.8); wheel(12.2); wheel(13.8)
+                    ctx.beginPath()
+                    ctx.moveTo(6.2, h - 1.2); ctx.lineTo(10.8, h - 1.2)
+                    ctx.lineTo(10.4, h - 0.55); ctx.lineTo(6.6, h - 0.55)
+                    ctx.closePath()
+                    ctx.fill()
+                    // The body: a short sloping nose at the front, on the left,
+                    // the windshield above it, then the cab and a long hood.
+                    ctx.beginPath()
+                    ctx.moveTo(0.3, h - 1.55)
+                    ctx.lineTo(0.3, h - 2.5)
+                    ctx.lineTo(1.1, h - 3.05)
+                    ctx.lineTo(1.35, h - 3.1)
+                    ctx.lineTo(2.1, h - 4.3)
+                    ctx.lineTo(2.5, h - 4.4)
+                    ctx.lineTo(16.6, h - 4.4)
+                    ctx.lineTo(16.9, h - 4.15)
+                    ctx.lineTo(16.9, h - 1.55)
+                    ctx.closePath()
+                    ctx.fill()
+                    // On the roof: the exhaust stack, and the raised housing for
+                    // the radiator fans at the rear.
+                    box(8.2, 4.4, 8.9, 4.7)
+                    box(12.0, 4.4, 16.2, 4.6)
+                    // The lit cab window, and the windshield catching some of it.
+                    ctx.fillStyle = warm
+                    ctx.globalAlpha = 0.85
+                    box(2.5, 3.1, 3.6, 3.9)
+                    ctx.globalAlpha = 0.25
+                    ctx.beginPath()
+                    ctx.moveTo(1.45, h - 3.2); ctx.lineTo(2.1, h - 4.15)
+                    ctx.lineTo(2.35, h - 4.1); ctx.lineTo(1.75, h - 3.2)
+                    ctx.closePath()
+                    ctx.fill()
+                    ctx.globalAlpha = 1
+                } else {
+                    ctx.fillStyle = under
+                    box(1.8, 0.5, 5.0, 1.2)
+                    box(20.0, 0.5, 23.2, 1.2)
+                    wheel(2.6); wheel(4.2); wheel(20.8); wheel(22.4)
+                    // A coach body with a rounded roof.
+                    ctx.fillStyle = body
+                    var r = 0.6
+                    ctx.beginPath()
+                    ctx.moveTo(0, h - 1.15)
+                    ctx.lineTo(0, h - (spec.tall - r))
+                    ctx.quadraticCurveTo(0, 0, r, 0)
+                    ctx.lineTo(spec.length - r, 0)
+                    ctx.quadraticCurveTo(spec.length, 0, spec.length, h - (spec.tall - r))
+                    ctx.lineTo(spec.length, h - 1.15)
+                    ctx.closePath()
+                    ctx.fill()
+                    // Windows down the side, a few of them dark, and the small
+                    // windows in the doors at either end.
+                    ctx.fillStyle = warm
+                    for (var w = 0; w < 10; w++) {
+                        ctx.globalAlpha = ((number * 7 + w * 3) % 5) === 0 ? 0.12 : 0.6
+                        box(2.9 + w * 2.05, 2.3, 4.3 + w * 2.05, 3.25)
+                    }
+                    ctx.globalAlpha = 0.35
+                    box(0.7, 2.6, 1.3, 3.25)
+                    box(23.7, 2.6, 24.3, 3.25)
+                    ctx.globalAlpha = 1
+                }
             }
         }
     }
 
-    // The headlight and the glow it throws down the line ahead.
+    // The diesel's headlight and the glow it throws down the line ahead, and a
+    // ditch light low on its nose that flashes while the horn sounds.
     Item {
-        id: head
-        readonly property real unit: root.sizeAt(root.headX)
-        readonly property real front: root.width * root.headX - root.carLength * unit * 0.5
-        readonly property real level: root.trackY(root.headX) - root.carHeight * unit * 0.6
-        visible: root.running && root.headX > -0.02 && root.headX < 1.02
+        id: lamps
+        readonly property real m: root.metre * root.layout[0].unit
+        readonly property real nose: root.layout[0].x + 0.3 * m
+        readonly property real rail: root.trackY((root.layout[0].x + 8 * m) / Math.max(1, root.width))
+        visible: root.running && root.headX > -0.05 && root.headX < 1.05
         opacity: root.fade
 
         SoftGlow {
-            width: root.height * 0.2 * head.unit
-            height: root.height * 0.05 * head.unit
-            x: head.front - width * 0.9
-            y: head.level - height / 2
+            width: 26 * lamps.m
+            height: 6 * lamps.m
+            x: lamps.nose - width * 0.92
+            y: lamps.rail - 2.7 * lamps.m - height / 2
             color: "#ffe8b0"
             strength: 0.5
         }
         SoftGlow {
-            width: root.height * 0.045 * head.unit
+            width: 5 * lamps.m
             height: width
-            x: head.front - width / 2
-            y: head.level - height / 2
+            x: lamps.nose - width / 2
+            y: lamps.rail - 2.7 * lamps.m - height / 2
             color: "#fff6dc"
+        }
+        SoftGlow {
+            readonly property bool on: !root.horning || Math.floor(root.seconds * 2) % 2 === 0
+            width: 2.6 * lamps.m
+            height: width
+            x: lamps.nose - width / 2
+            y: lamps.rail - 1.4 * lamps.m - height / 2
+            color: "#fff1cc"
+            opacity: on ? 0.9 : 0.15
         }
     }
 }
