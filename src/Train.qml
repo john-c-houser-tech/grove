@@ -244,15 +244,17 @@ Item {
                 ctx.lineTo(topPt.x + (footPt.x - topPt.x) * 0.7 + 1, topPt.y + (footPt.y - topPt.y) * 0.75)
                 ctx.stroke()
             }
-            // A nearer hill stands on the left, taller than the one the road
-            // climbs. Its top runs off the left edge; its right flank comes
+            // A nearer hill stands to the left of the cut. Its right flank comes
             // steeply down across the farther hill and the road's last stretch,
             // so the road passes out of sight behind it. Being nearer, it is
             // darker and less hazy than the hill behind.
             var bend = curve(far0, far1, far2, far3, 0.86)
             var y0 = H * root.horizon
-            var crest = y0 - H * 0.235
-            var shoulderX = bend.x - W * 0.15
+            // A modest rounded hill: it rises out of the valley on its left to a
+            // gentle top, then comes down steeply across the road's last stretch.
+            var crest = y0 - H * 0.155
+            var topX = bend.x - W * 0.11
+            var footLeft = bend.x - W * 0.34
             var near = ctx.createLinearGradient(0, crest, 0, cy)
             var nearTop = Qt.darker(root.hillColor, 1.12)
             near.addColorStop(0, nearTop)
@@ -260,12 +262,12 @@ Item {
                                          nearTop.g + (root.hazeColor.g - nearTop.g) * 0.25,
                                          nearTop.b + (root.hazeColor.b - nearTop.b) * 0.25, 1))
             function nearHillOutline() {
-                ctx.moveTo(-2, crest + H * 0.012)
-                // A broad rounded top, a little uneven.
-                ctx.bezierCurveTo(W * 0.1, crest - H * 0.004, shoulderX - W * 0.12, crest - H * 0.006, shoulderX, crest)
-                // The flank: rounding over, then steep, down to the road's end.
-                ctx.bezierCurveTo(shoulderX + W * 0.07, crest + H * 0.004,
-                                  bend.x - W * 0.012, bend.y - H * 0.06,
+                ctx.moveTo(footLeft, cy + 1)
+                // The long left slope up out of the valley.
+                ctx.bezierCurveTo(footLeft + W * 0.1, cy - H * 0.02, topX - W * 0.12, crest + H * 0.004, topX, crest)
+                // Over the top and down the steep right flank to the road's end.
+                ctx.bezierCurveTo(topX + W * 0.06, crest - H * 0.002,
+                                  bend.x - W * 0.012, bend.y - H * 0.045,
                                   bend.x + W * 0.004, bend.y + H * 0.008)
                 // Its foot reaches the valley floor just beyond the road.
                 ctx.quadraticCurveTo(bend.x + W * 0.012, cy - H * 0.006, bend.x + W * 0.03, cy + 1)
@@ -273,7 +275,6 @@ Item {
             ctx.fillStyle = near
             ctx.beginPath()
             nearHillOutline()
-            ctx.lineTo(-2, cy + 1)
             ctx.closePath()
             ctx.fill()
             // A faint line where the near hill's edge stands against the far one.

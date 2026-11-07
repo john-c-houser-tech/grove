@@ -124,8 +124,8 @@ Item {
                                           weatherTint), light.nightTint), light.warmTint)
         }
         // Winter snow reaches low; by summer only the highest peaks keep any.
-        readonly property real snowline: weather.season === "winter" ? 0.42 : weather.season === "spring" ? 0.58
-                                       : weather.season === "autumn" ? 0.66 : 0.8
+        readonly property real snowline: weather.season === "winter" ? 0.4 : weather.season === "spring" ? 0.52
+                                       : weather.season === "autumn" ? 0.56 : 0.66
         // After dark the land goes to silhouette against the sky, so the far
         // peaks keep an edge even when cloud washes the sky toward their colour.
         readonly property real dark: 1 - light.ambient

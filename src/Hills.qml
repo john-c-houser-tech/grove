@@ -51,9 +51,28 @@ Canvas {
 
     // Height of each layer's ridge above the horizon, in pixels, at fraction u
     // of the way across.
+    // The far range, after the Tetons: no foothills, a wall of steep pointed
+    // peaks rising straight from the valley, tallest in a cluster just right of
+    // the middle and lower, still jagged, out to both edges. Each peak is its
+    // middle, its top (fraction of the height above the horizon), and how
+    // steeply it falls away on the left and on the right.
+    readonly property var peaks: [
+        [0.0, 0.215, 1.6, 1.8], [0.08, 0.235, 1.5, 2.0], [0.16, 0.222, 1.8, 1.6],
+        [0.24, 0.25, 1.6, 2.1], [0.32, 0.265, 1.9, 1.7], [0.39, 0.285, 2.0, 2.4],
+        [0.455, 0.335, 2.6, 2.2], [0.515, 0.302, 2.3, 1.9], [0.57, 0.287, 2.1, 1.8],
+        [0.64, 0.255, 1.7, 1.9], [0.72, 0.242, 1.6, 1.7], [0.8, 0.228, 1.7, 1.5],
+        [0.88, 0.24, 1.5, 1.9], [0.96, 0.222, 1.8, 1.6], [1.03, 0.21, 1.6, 1.6]
+    ]
     function far(u, H) {
-        var v = 0.55 * ridged(u * 2.4 + 3, 1) + 0.3 * ridged(u * 5.3 + 9, 2) + 0.15 * ridged(u * 11.7 + 4, 3)
-        return H * (0.04 + 0.3 * Math.pow(v, 0.9))
+        var h = 0.13
+        for (var i = 0; i < peaks.length; i++) {
+            var p = peaks[i]
+            var fall = u < p[0] ? (p[0] - u) * p[2] : (u - p[0]) * p[3]
+            h = Math.max(h, p[1] - fall)
+        }
+        // A serrated skyline: granite breaks into teeth and notches.
+        h += 0.011 * (ridged(u * 38 + 7, 9) - 0.45) + 0.005 * (noise(u * 95, 10) - 0.5)
+        return H * h
     }
     function mid(u, H) {
         // A shoulder of hill rises behind the level crossing, so the road
@@ -117,7 +136,8 @@ Canvas {
         for (var sx = W; sx >= 0; sx -= 4) {
             // The snowline wanders with the rock, so caps have jagged feet.
             var u = sx / W
-            var wobble = H * (0.035 * (noise(u * 18, 7) - 0.5) + 0.02 * (noise(u * 47, 8) - 0.5))
+            // Each face holds its snow differently: some low, some high.
+            var wobble = H * (0.06 * (noise(u * 7, 7) - 0.5) + 0.03 * (noise(u * 23, 13) - 0.5) + 0.012 * (noise(u * 60, 8) - 0.5))
             ctx.lineTo(sx, snowY + wobble)
         }
         ctx.closePath()
@@ -126,6 +146,36 @@ Canvas {
         cap.addColorStop(1, mix(snowColor, farColor, 0.35))
         ctx.fillStyle = cap
         ctx.fill()
+        // Below the snowfields, snow runs on down the steep gullies that score
+        // the faces: long thin streaks leaving the snow, angling down the face
+        // and thinning out to nothing.
+        for (var pk = 0; pk < peaks.length; pk++) {
+            var peak = peaks[pk]
+            if (y0 - H * peak[1] > snowY - H * 0.015)
+                continue
+            for (var g = 0; g < 3; g++) {
+                var side = g === 1 ? 1 : -1
+                var slope = side < 0 ? peak[2] : peak[3]
+                var gu = peak[0] + side * (0.006 + 0.016 * noise(pk * 2.1 + g * 5, 11))
+                var gx = W * gu
+                // Start inside the snow, a little above where it ends here.
+                var gtop = Math.max(y0 - far(gu, H) + H * 0.01, snowY - H * 0.02)
+                var len = H * (0.03 + 0.03 * noise(pk * 3.3 + g, 12))
+                var drift = side * len * (0.18 + 0.25 / slope)
+                var streak = ctx.createLinearGradient(0, gtop, 0, gtop + len)
+                streak.addColorStop(0, Qt.rgba(snowColor.r, snowColor.g, snowColor.b, 0.65))
+                streak.addColorStop(1, Qt.rgba(snowColor.r, snowColor.g, snowColor.b, 0))
+                ctx.fillStyle = streak
+                var half = H * 0.0018
+                ctx.beginPath()
+                ctx.moveTo(gx - half, gtop)
+                ctx.lineTo(gx + half, gtop)
+                ctx.quadraticCurveTo(gx + drift * 0.4 + half * 0.5, gtop + len * 0.5, gx + drift, gtop + len)
+                ctx.quadraticCurveTo(gx + drift * 0.4 - half * 0.5, gtop + len * 0.5, gx - half, gtop)
+                ctx.closePath()
+                ctx.fill()
+            }
+        }
         ctx.restore()
 
         paintRidge(ctx, mid, H * 0.2, 0, midColor, 0.4)
