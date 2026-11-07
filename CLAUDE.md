@@ -34,5 +34,18 @@ Quick, built with qmake. See `README.md` for what it does and
   previous build's frames before it is committed.
 - Run `bin/check` after any change to ownership, threads or the QML engine,
   and say what it reported.
-- Commit only when asked. The repository is local, on `master`, with no
-  remote.
+- Commit only when asked.
+
+## Git
+
+The repository is https://github.com/john-c-houser-tech/grove. `main` is
+John's: never commit or push to it, and never force-push. `dev` is the
+integration branch.
+
+1. Before any new work: `git checkout dev && git pull --ff-only`.
+2. Branch from dev: `git checkout -b <feature>`. Check `git branch --show-current`
+   before every commit.
+3. Commit there, push the branch, and open a PR into dev: `gh pr create --base dev`.
+4. Request a Copilot review (`gh pr edit <n> --add-reviewer @copilot`) and
+   address its comments with follow-up commits.
+5. John merges to main. Wait for him.
