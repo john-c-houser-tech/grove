@@ -153,6 +153,7 @@ ApplicationWindow {
         // they move slowly, so it crosses at most once each way.
         ColumnLayout {
             id: heading
+            objectName: "heading"
             anchors.top: parent.top
             anchors.topMargin: 18
             spacing: 2
@@ -232,6 +233,7 @@ ApplicationWindow {
         // Made only while it is open, so the tiles and their pictures are not
         // kept the rest of the time.
         Loader {
+            objectName: "gardenLoader"
             anchors.fill: parent
             active: win.gardenVisible
             sourceComponent: GardenView {}
@@ -278,6 +280,7 @@ ApplicationWindow {
 
     Dialog {
         id: confirm
+        objectName: "confirm"
         property string action: "giveup"
         anchors.centerIn: parent
         modal: true

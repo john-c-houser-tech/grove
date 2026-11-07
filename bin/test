@@ -2,9 +2,17 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-mkdir -p "$ROOT/build/tests"
-cd "$ROOT/build/tests"
 
-qmake6 "$ROOT/tests/grove_tests.pro"
-make -j"$(nproc)"
-QT_QPA_PLATFORM=offscreen ./grove_tests
+# Nothing is shown on the desktop: both programs run on the offscreen
+# platform, and the scene tests draw with the GPU renderer, as on screen.
+export QT_QPA_PLATFORM=offscreen
+export QT_QUICK_BACKEND=rhi
+export QSG_RHI_BACKEND=opengl
+
+for suite in grove_tests scene_tests; do
+    mkdir -p "$ROOT/build/$suite"
+    cd "$ROOT/build/$suite"
+    qmake6 "$ROOT/tests/$suite.pro" >/dev/null
+    make -j"$(nproc)" >/dev/null
+    ./"$suite" "$@"
+done

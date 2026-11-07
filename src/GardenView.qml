@@ -61,6 +61,7 @@ Rectangle {
 
         GridView {
             id: grid
+            objectName: "gardenGrid"
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: count > 0
