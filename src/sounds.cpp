@@ -300,12 +300,21 @@ void Sounds::fire(const QString &kind) {
         if (kind == "plane" && (period != "day" || (m_flightWeatherOk && !m_flightWeatherOk())))
             return;
     }
-    if (kind == "plane") {
-        QRandomGenerator *random = QRandomGenerator::global();
-        emit planeFlyover(random->bounded(2) ? 1 : -1, planeMilliseconds(), random->generateDouble());
-    }
-    if (!m_muted)
+    if (m_muted)
+        showVisual(kind);
+    else
         play(kind);
+}
+
+void Sounds::showVisual(const QString &kind) {
+    QRandomGenerator *random = QRandomGenerator::global();
+    const int direction = random->bounded(2) ? 1 : -1;
+    if (kind == "plane")
+        emit planeFlyover(direction, planeMilliseconds(), random->generateDouble());
+    else
+        // The crossing sits well inside the view, so there is time to watch the
+        // train come and to see it go.
+        emit trainPassing(direction, trainMilliseconds(), 0.4 + 0.25 * random->generateDouble());
 }
 
 void Sounds::play(const QString &kind, int retries) {
@@ -317,12 +326,15 @@ void Sounds::play(const QString &kind, int retries) {
         // Still being made; try again in a moment rather than miss it.
         if (retries > 0)
             QTimer::singleShot(1000, this, [this, kind, retries] { play(kind, retries - 1); });
+        else
+            showVisual(kind);
         return;
     }
     if (!m_sink) {
         const QAudioDevice device = QMediaDevices::defaultAudioOutput();
         if (device.isNull()) {
             setProblem(tr("No audio output found, so the distant sounds are silent."));
+            showVisual(kind);
             return;
         }
         QAudioFormat format;
@@ -331,6 +343,7 @@ void Sounds::play(const QString &kind, int retries) {
         format.setSampleFormat(QAudioFormat::Int16);
         if (!device.isFormatSupported(format)) {
             setProblem(tr("The audio output cannot play 16-bit sound, so the distant sounds are silent."));
+            showVisual(kind);
             return;
         }
         m_sink = new QAudioSink(device, format, this);
@@ -341,5 +354,8 @@ void Sounds::play(const QString &kind, int retries) {
     m_buffer.close();
     m_buffer.setData(m_playing);
     m_buffer.open(QIODevice::ReadOnly);
+    // The picture starts as the sound does, so a sound that was late being made
+    // never leaves them out of step.
+    showVisual(kind);
     m_sink->start(&m_buffer);
 }

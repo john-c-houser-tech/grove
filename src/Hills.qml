@@ -9,6 +9,9 @@ Canvas {
 
     // Where the horizon sits, as a fraction of the height.
     property real horizon: 0.88
+    // "back" draws the peaks and ridges, "front" the hillside nearest to us, so
+    // something can pass between them.
+    property string part: "all"
     // How low the snow reaches on the far peaks, as a fraction of their height.
     property real snowline: 0.65
 
@@ -77,6 +80,8 @@ Canvas {
         ctx.fill()
     }
 
+    onPartChanged: requestPaint()
+
     onPaint: {
         var ctx = getContext("2d")
         ctx.reset()
@@ -84,6 +89,10 @@ Canvas {
         if (W <= 0 || H <= 0)
             return
         var y0 = H * horizon
+        if (part === "front") {
+            paintRidge(ctx, near, H * 0.14, 0, nearColor, 0.18)
+            return
+        }
 
         // Far peaks, with snow above a ragged snowline.
         paintRidge(ctx, far, H * 0.5, 0, farColor, 0.55)
@@ -114,6 +123,7 @@ Canvas {
         ctx.restore()
 
         paintRidge(ctx, mid, H * 0.2, 0, midColor, 0.4)
-        paintRidge(ctx, near, H * 0.14, 0, nearColor, 0.18)
+        if (part === "all")
+            paintRidge(ctx, near, H * 0.14, 0, nearColor, 0.18)
     }
 }

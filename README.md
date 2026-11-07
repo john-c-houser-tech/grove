@@ -17,10 +17,12 @@ way it stays in your garden.
   bare and frosted in winter. The weather is invented, never fetched.
 - **Distant sounds.** Only while a plant is growing, and always faint. At
   night a train now and then approaches a crossing, with its horn, the bells
-  and the rumble of the rails, one to three times in a session. By day a small
-  plane flies over now and then; you can see it cross the sky while its engine
-  drones very far off. Both are synthesized at start-up, so nothing is shipped
-  or downloaded. M mutes the sound (the plane still flies).
+  and the rumble of the rails, one to three times in a session. You can see it
+  too: a headlight and rows of lit windows slide along the plain behind the
+  nearest hill, and the crossing lamps flash in turn with the bells. By day a
+  small plane flies over now and then, crossing the sky while its engine drones
+  very far off. All of it is synthesized and drawn at start-up, so nothing is
+  shipped or downloaded. M mutes the sound (the picture stays).
 - **A garden.** Every finished or wilted plant is kept, and G shows them all.
 - **A nudge when it is done.** A desktop notification tells you the plant is
   fully grown, even if Grove is buried under other windows. Your shell's

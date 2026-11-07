@@ -13,8 +13,9 @@
 
 // Faint sounds from far away while a plant grows. At night a train approaches
 // a crossing, one to three times in a session; by day a small plane flies
-// over now and then. Both are synthesized, never shipped or fetched, and the
-// plane is also seen crossing the sky. M mutes the sound.
+// over now and then. Both are synthesized, never shipped or fetched, and both
+// are also seen: the plane crossing the sky, the train along the plain. M mutes
+// the sound but not the picture.
 class Sounds : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
@@ -59,10 +60,16 @@ signals:
     // A plane crosses the sky: direction is 1 for left to right and -1 for the
     // other way, and altitude from 0 to 1 is how high it flies.
     void planeFlyover(int direction, int milliseconds, double altitude);
+    // A train runs along the plain to a crossing: direction as for the plane,
+    // and crossing is how far along from the edge it entered, from 0 to 1, that
+    // the crossing lies. The flight times itself to the sound.
+    void trainPassing(int direction, int milliseconds, double crossing);
 
 private:
     void fire(const QString &kind);
     void play(const QString &kind, int retries = 8);
+    // Shows what goes with the sound, starting together with it.
+    void showVisual(const QString &kind);
     void prepare(const QString &kind);
     void setProblem(const QString &problem);
 
