@@ -83,7 +83,8 @@ the same or the line before.
 - Nothing is shown on the desktop: tests run on the offscreen platform.
   `GROVE_SHOTS=dir build/scene_tests/scene_tests framesForReview` saves
   frames of several scenes for review. A visual change is checked by
-  comparing them with the previous build's.
+  comparing them with the previous build's. `GROVE_README_SHOTS=dir` with
+  `framesForReadme` makes the README's two pictures in the same way.
 - Tests never touch the user's garden, theme, language, notifications or
   settings: `App::Options` points each at the test's own.
 
