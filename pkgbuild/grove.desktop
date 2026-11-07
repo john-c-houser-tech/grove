@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Grove
+Comment=A focus timer that grows a plant while you work
+Exec=grove
+Icon=grove
+Terminal=false
+Categories=Utility;
+StartupWMClass=grove
