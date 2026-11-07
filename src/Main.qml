@@ -22,7 +22,7 @@ ApplicationWindow {
     property bool quitConfirmed: false
     readonly property bool growing: backend.state === "growing"
     // Overcast, rain and fog dull the light on the plant and the ground.
-    readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.14 * weather.cloud + 0.14 * weather.rain + 0.2 * weather.fog))
+    readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.14 * weather.cloud + 0.14 * weather.rain + 0.28 * weather.fog))
 
     // Numbers take the language's digits and separators, and re-render when
     // the language changes.

@@ -44,9 +44,9 @@ Item {
         anchors.fill: parent
         opacity: root.fog
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.12) }
-            GradientStop { position: 0.6; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.38) }
-            GradientStop { position: 1.0; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.55) }
+            GradientStop { position: 0.0; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.18) }
+            GradientStop { position: 0.6; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.5) }
+            GradientStop { position: 1.0; color: Qt.rgba(root.fogColor.r, root.fogColor.g, root.fogColor.b, 0.7) }
         }
     }
 
@@ -70,7 +70,7 @@ Item {
             y: root.height * (0.55 + 0.3 * ((index * 0.37) % 1))
             x: ((a + root.drift * (4 + index * 2)) % 1) * (root.width + w) - w
             color: root.fogColor
-            opacity: root.fog * 0.15
+            opacity: root.fog * 0.24
         }
     }
 }
