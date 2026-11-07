@@ -9,7 +9,7 @@ draw and easy to read, and tools check as many of them as they can.
 |---------|----------------|
 | `bin/lint` | Formatting (`.clang-format`); compiler warnings as errors (`-Wall -Wextra -Wpedantic -Wshadow -Werror`); `clang-tidy` (`.clang-tidy`); `qmllint` against the Grove module, with no warning allowed; every translation catalog complete. |
 | `bin/test` | The unit tests, and the scene tests: the whole app drawn offscreen and driven by keys, where any QML warning fails. |
-| `bin/check-leaks` | Both test programs under AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer, with no suppressions, and a soak test that fails if the heap keeps rising. `--canary` plants a leak and kept memory, and passes only if both are caught. |
+| `bin/check-leaks` | Both test programs under AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer, with no suppressions; then under Valgrind, when it is installed, with one suppression for a Qt read it misreports (`tests/valgrind.supp`); and a soak test that fails if the heap keeps rising. `--canary` plants a leak and kept memory, and passes only if every part catches them. |
 | `bin/check` | All three. |
 
 The pre-commit hook in `githooks/` runs `bin/lint` and `bin/test`; enable it
@@ -80,10 +80,13 @@ the same or the line before.
 - A bug fix comes with a test that fails without it. Check by undoing the fix.
 - Unit tests cover classes; scene tests cover what a user does, through keys,
   in the real window.
-- Nothing is shown on the desktop: tests run on the offscreen platform.
-  `GROVE_SHOTS=dir build/scene_tests/scene_tests framesForReview` saves
-  frames of several scenes for review. A visual change is checked by
-  comparing them with the previous build's.
+- Nothing is shown on the desktop: the scene-test program always runs on the
+  offscreen platform, whatever the session sets, so every command below is
+  headless as written. `GROVE_SHOTS=dir build/scene_tests/scene_tests
+  framesForReview` saves frames of several scenes for review; a visual change
+  is checked by comparing them with the previous build's.
+  `GROVE_README_SHOTS=dir build/scene_tests/scene_tests framesForReadme` makes
+  the README's two pictures the same way.
 - Tests never touch the user's garden, theme, language, notifications or
   settings: `App::Options` points each at the test's own.
 
