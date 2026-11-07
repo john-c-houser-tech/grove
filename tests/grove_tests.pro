@@ -1,4 +1,4 @@
-QT += core gui quick quickcontrols2 testlib dbus multimedia concurrent
+QT += core gui quick quickcontrols2 testlib dbus multimedia concurrent network
 CONFIG += c++17 testcase
 TARGET = grove_tests
 TEMPLATE = app

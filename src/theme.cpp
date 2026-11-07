@@ -29,21 +29,36 @@ Theme::Theme(const QString &directory, QObject *parent, const QString &hyprctl)
     m_roundingTimeout.setSingleShot(true);
     m_roundingTimeout.setInterval(500);
     connect(&m_roundingTimeout, &QTimer::timeout, &m_roundingProcess, &QProcess::kill);
-    connect(&m_roundingProcess, &QProcess::errorOccurred, this, [this] { m_roundingTimeout.stop(); });
+    connect(&m_roundingProcess, &QProcess::errorOccurred, this, [this] {
+        m_roundingTimeout.stop();
+        askAgainIfPending();
+    });
     connect(&m_roundingProcess, &QProcess::finished, this, [this](int code, QProcess::ExitStatus status) {
         m_roundingTimeout.stop();
         const auto value = QJsonDocument::fromJson(m_roundingProcess.readAllStandardOutput()).object().value("int");
-        if (code != 0 || status != QProcess::NormalExit || !value.isDouble() || value.toInt(-1) < 0)
-            return;
-        if (value.toInt() != m_radius) {
+        if (code == 0 && status == QProcess::NormalExit && value.isDouble() && value.toInt(-1) >= 0
+            && value.toInt() != m_radius) {
             m_radius = value.toInt();
             emit changed();
         }
+        askAgainIfPending();
     });
-    m_roundingPoll.setInterval(1000);
-    connect(&m_roundingPoll, &QTimer::timeout, this, &Theme::refreshRounding);
-    if (!m_hyprctl.isEmpty())
-        m_roundingPoll.start();
+
+    // Hyprland announces every config reload on its event socket, which covers
+    // a theme switch and an edited override alike, so the rounding is asked for
+    // then rather than polled.
+    if (directory.isEmpty() && !m_hyprctl.isEmpty()) {
+        connect(&m_events, &QLocalSocket::readyRead, this, [this] {
+            bool reloaded = false;
+            while (m_events.canReadLine())
+                reloaded |= m_events.readLine().startsWith("configreloaded>>");
+            if (reloaded)
+                refreshRounding();
+        });
+        m_events.connectToServer(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/hypr/" +
+                                     qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE") + "/.socket2.sock",
+                                 QIODevice::ReadOnly);
+    }
     reload();
 }
 
@@ -55,10 +70,23 @@ Theme::~Theme() {
 }
 
 void Theme::refreshRounding() {
-    if (m_hyprctl.isEmpty() || m_roundingProcess.state() != QProcess::NotRunning)
+    if (m_hyprctl.isEmpty())
         return;
+    // A reload during a query may have changed the answer, so ask once more after it.
+    if (m_roundingProcess.state() != QProcess::NotRunning) {
+        m_roundingPending = true;
+        return;
+    }
     m_roundingProcess.start(m_hyprctl, {"-j", "getoption", "decoration:rounding"});
     m_roundingTimeout.start();
+}
+
+void Theme::askAgainIfPending() {
+    if (!m_roundingPending)
+        return;
+    m_roundingPending = false;
+    // The process is still winding down inside its own signal; start it afresh after.
+    QTimer::singleShot(0, this, &Theme::refreshRounding);
 }
 
 QString Theme::readAccent(const QString &path) {

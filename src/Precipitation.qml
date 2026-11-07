@@ -20,6 +20,14 @@ Item {
                                               Math.max(0, Math.min(1, level * 0.99 + cast * (sky.g - skyMean))),
                                               Math.max(0, Math.min(1, level + 0.02 + cast * (sky.b - skyMean))), 1)
 
+    // An image particle blends its colour as though it were already multiplied
+    // by its alpha, so it is given that way; a plain colour with an alpha comes
+    // out nearly opaque. `c` must be a color, not a colour name, which has no
+    // channels to scale.
+    function premultiplied(c, alpha) { return Qt.rgba(c.r * alpha, c.g * alpha, c.b * alpha, 1) }
+    readonly property color dropColor: "#b4cde0"
+    readonly property color flakeColor: root.ambient > 0.5 ? "#ffffff" : "#c9d6ee"
+
     ParticleSystem {
         id: system
         running: root.rain > 0.02
@@ -34,17 +42,17 @@ Item {
         emitRate: 420 * root.rain
         lifeSpan: 1000
         velocity: AngleDirection { angle: 98; angleVariation: 3; magnitude: 880; magnitudeVariation: 120 }
-        size: 1
+        // The streak is 14 px long inside a 16 px square image.
+        size: 16
     }
-    ItemParticle {
+    // Image particles are drawn together by the GPU; an item per drop would be
+    // hundreds of items alive at once, each one laid out and drawn on its own.
+    ImageParticle {
         system: system
-        delegate: Rectangle {
-            width: 1.5
-            height: 14
-            rotation: 8
-            color: "#b4cde0"
-            opacity: 0.45
-        }
+        source: "images/rain.png"
+        rotation: 8
+        color: root.premultiplied(root.dropColor, 0.45)
+        alpha: 0.45
     }
 
     // Snow drifts down and sways, a few large flakes among many small ones.
@@ -52,32 +60,45 @@ Item {
         id: snowSystem
         running: root.snow > 0.02
     }
-    Emitter {
-        system: snowSystem
-        x: -40
-        y: -20
-        width: root.width + 80
-        height: 1
-        enabled: root.snow > 0.02
-        emitRate: 50 * root.snow
-        lifeSpan: 8000
-        velocity: AngleDirection { angle: 90; angleVariation: 8; magnitude: 100; magnitudeVariation: 30 }
-        size: 1
+    // Faint flakes, middling ones and bright ones in equal numbers, so some
+    // seem farther off. An image particle cannot vary its opacity flake by flake
+    // (see premultiplied()), so each opacity is a group of its own.
+    Repeater {
+        model: [{ group: "faint", alpha: 0.5 }, { group: "middling", alpha: 0.7 }, { group: "bright", alpha: 0.9 }]
+        delegate: Item {
+            Emitter {
+                system: snowSystem
+                group: modelData.group
+                x: -40
+                y: -20
+                width: root.width + 80
+                height: 1
+                enabled: root.snow > 0.02
+                emitRate: 50 / 3 * root.snow
+                lifeSpan: 8000
+                velocity: AngleDirection { angle: 90; angleVariation: 8; magnitude: 100; magnitudeVariation: 30 }
+                // Flakes 2 to 6 px across.
+                size: 4
+                sizeVariation: 2
+            }
+            ImageParticle {
+                system: snowSystem
+                groups: [modelData.group]
+                source: "images/snow.png"
+                // A round flake looks the same turned any way, but turning puts it
+                // on Qt's quad path. The plainer path sizes particles by the
+                // screen's whole-number scale rather than the window's, so at 125%
+                // every flake came out 1.6 times too big.
+                autoRotation: true
+                color: root.premultiplied(root.flakeColor, modelData.alpha)
+                alpha: modelData.alpha
+            }
+        }
     }
     Wander {
         system: snowSystem
         xVariance: 45
         pace: 90
-    }
-    ItemParticle {
-        system: snowSystem
-        delegate: Rectangle {
-            width: 2 + Math.random() * 4
-            height: width
-            radius: width / 2
-            color: root.ambient > 0.5 ? "#ffffff" : "#c9d6ee"
-            opacity: 0.5 + Math.random() * 0.4
-        }
     }
 
     // Veil: light overhead, heavy near the ground.
@@ -91,14 +112,14 @@ Item {
         }
     }
 
-    // Wisps drifting along the ground.
+    // Wisps drifting along the ground, moved on by a timer for the same
+    // reason as the clouds (see Clouds.qml). The drift is in seconds.
     property real drift: 0
-    NumberAnimation on drift {
-        from: 0
-        to: 1
-        duration: 420000
-        loops: Animation.Infinite
+    Timer {
+        interval: 66
+        repeat: true
         running: root.fog > 0.02
+        onTriggered: root.drift += interval / 1000
     }
     Repeater {
         model: 5
@@ -113,7 +134,8 @@ Item {
             width: w
             height: w * 0.24
             y: root.height * (0.5 + 0.34 * ((index * 0.37) % 1))
-            x: ((a + root.drift * (4 + index * 2)) % 1) * (root.width + w) - w
+            // Crosses `4 + 2 * index` times in seven minutes.
+            x: ((a + root.drift * (4 + index * 2) / 420) % 1) * (root.width + w) - w
             opacity: root.fog * 0.75
         }
     }

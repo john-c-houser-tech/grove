@@ -12,6 +12,8 @@
         <file alias="Train.qml">Train.qml</file>
         <file alias="GardenView.qml">GardenView.qml</file>
         <file alias="Precipitation.qml">Precipitation.qml</file>
+        <file alias="images/rain.png">images/rain.png</file>
+        <file alias="images/snow.png">images/snow.png</file>
         <file alias="i18n/en.json">i18n/en.json</file>
         <file alias="i18n/da.json">i18n/da.json</file>
         <file alias="i18n/de.json">i18n/de.json</file>

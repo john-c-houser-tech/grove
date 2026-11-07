@@ -30,6 +30,8 @@ void Backend::start() {
     m_progress = 0;
     // A fresh seed per session, so no two plants are alike.
     m_seed = static_cast<int>(QRandomGenerator::global()->bounded(1, 1 << 30));
+    m_shownRemaining = remaining();
+    m_shownProgress = 0;
     setState("growing");
     emit progressChanged();
     m_clock.start();
@@ -49,7 +51,16 @@ void Backend::advance(qint64 milliseconds) {
     m_elapsed += std::max<qint64>(0, milliseconds);
     const qint64 total = static_cast<qint64>(m_seconds) * 1000;
     m_progress = std::min(1.0, static_cast<double>(m_elapsed) / total);
-    emit progressChanged();
+    // A tick grows the plant by a thirty-thousandth of a full session, far too
+    // little to see, and every listener redraws for it. So the window hears
+    // only when the countdown moves on a second or the plant has grown enough
+    // to show, which in a short test session is still many times a second.
+    const int left = remaining();
+    if (left != m_shownRemaining || m_progress - m_shownProgress >= 0.002 || m_elapsed >= total) {
+        m_shownRemaining = left;
+        m_shownProgress = m_progress;
+        emit progressChanged();
+    }
     if (m_elapsed >= total) {
         m_timer.stop();
         setState("done");

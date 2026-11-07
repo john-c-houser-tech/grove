@@ -82,6 +82,39 @@ private slots:
         QCOMPARE(backend.progress(), 0.5);
     }
 
+    void fullSessionsAnnounceProgressOnceASecond()
+    {
+        Backend backend(25 * 60);
+        backend.start();
+        QSignalSpy spy(&backend, &Backend::progressChanged);
+        // A second of 50 ms ticks: only the countdown moving on is worth a redraw.
+        for (int i = 0; i < 20; ++i)
+            backend.advance(50);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(backend.remaining(), 25 * 60 - 1);
+    }
+
+    void shortSessionsStillGrowSmoothly()
+    {
+        Backend backend(10);
+        backend.start();
+        QSignalSpy spy(&backend, &Backend::progressChanged);
+        for (int i = 0; i < 20; ++i)
+            backend.advance(50);
+        QCOMPARE(spy.count(), 20);
+    }
+
+    void theEndOfASessionIsAlwaysAnnounced()
+    {
+        Backend backend(25 * 60);
+        backend.start();
+        backend.advance(25 * 60 * 1000 - 10);
+        QSignalSpy spy(&backend, &Backend::progressChanged);
+        backend.advance(10);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(backend.progress(), 1.0);
+    }
+
     void sunriseIsEarlierInSummer()
     {
         double summerRise = 0, summerSet = 0, winterRise = 0, winterSet = 0;
@@ -223,6 +256,43 @@ private slots:
             QVERIFY(weather.growth() >= last);
             last = weather.growth();
         }
+    }
+
+    void growingDoesNotRedrawSteadyWeather()
+    {
+        Weather weather("rain");
+        weather.begin(1, QDate(2026, 11, 6));
+        QSignalSpy sky(&weather, &Weather::changed);
+        QSignalSpy growth(&weather, &Weather::growthChanged);
+        for (int i = 1; i <= 100; ++i)
+            weather.setProgress(i / 100.0);
+        QCOMPARE(sky.count(), 0);
+        QCOMPARE(growth.count(), 100);
+    }
+
+    void changingWeatherIsAnnouncedInVisibleStepsAndSettlesExactly()
+    {
+        for (int seed = 1; seed < 100; ++seed) {
+            Weather weather, jumped;
+            weather.begin(seed, QDate(2026, 11, 6));
+            jumped.begin(seed, QDate(2026, 11, 6));
+            jumped.setProgress(1.0);
+            if (jumped.kind() == weather.kind())
+                continue;
+            QSignalSpy sky(&weather, &Weather::changed);
+            // A full session's worth of announced ticks.
+            for (int i = 1; i <= 1500; ++i)
+                weather.setProgress(i / 1500.0);
+            QVERIFY(sky.count() > 5);
+            QVERIFY(sky.count() <= 110);
+            QCOMPARE(weather.kind(), jumped.kind());
+            QCOMPARE(weather.cloud(), jumped.cloud());
+            QCOMPARE(weather.rain(), jumped.rain());
+            QCOMPARE(weather.fog(), jumped.fog());
+            QCOMPARE(weather.snow(), jumped.snow());
+            return;
+        }
+        QFAIL("no seed changed the weather");
     }
 
     void trainFillsItsLengthAndFadesInAndOut()

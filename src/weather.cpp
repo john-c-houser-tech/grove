@@ -1,6 +1,7 @@
 #include "weather.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -70,7 +71,9 @@ void Weather::begin(int seed, const QDate &date) {
     }
     m_progress = 0;
     m_boost = 0;
-    refresh();
+    m_now = at(0);
+    emit changed();
+    emit growthChanged();
 }
 
 void Weather::setProgress(double progress) {
@@ -78,9 +81,23 @@ void Weather::setProgress(double progress) {
     // Rain makes the plant grow a little faster, never more than a sliver.
     const double gained = progress - m_progress;
     if (gained > 0)
-        m_boost = std::min(0.15, m_boost + gained * m_now.rain * 0.3);
+        m_boost = std::min(0.15, m_boost + gained * at(m_progress).rain * 0.3);
+    const double grown = growth();
     m_progress = progress;
-    refresh();
+    if (growth() != grown)
+        emit growthChanged();
+
+    // The hills, the field and the plant are all redrawn when the sky changes,
+    // and it changes over minutes, so a change is only announced once it has
+    // moved enough to see, and once more when it settles.
+    const Conditions next = at(progress);
+    const double moved = std::max({std::abs(next.cloud - m_now.cloud), std::abs(next.rain - m_now.rain),
+                                   std::abs(next.fog - m_now.fog), std::abs(next.snow - m_now.snow)});
+    const bool settled = progress <= 0.3 || progress >= 0.7;
+    if (moved >= 0.01 || (settled && moved > 0)) {
+        m_now = next;
+        emit changed();
+    }
 }
 
 QString Weather::kind() const {
@@ -95,11 +112,10 @@ QString Weather::kind() const {
     return "clear";
 }
 
-void Weather::refresh() {
+Weather::Conditions Weather::at(double progress) const {
     // The change happens in the middle of the session, not at a fixed moment.
-    const double s = smoothstep(0.3, 0.7, m_progress);
+    const double s = smoothstep(0.3, 0.7, progress);
     const Conditions a = conditions(m_from), b = conditions(m_to);
-    m_now = {a.cloud + (b.cloud - a.cloud) * s, a.rain + (b.rain - a.rain) * s, a.fog + (b.fog - a.fog) * s,
-             a.snow + (b.snow - a.snow) * s};
-    emit changed();
+    return {a.cloud + (b.cloud - a.cloud) * s, a.rain + (b.rain - a.rain) * s, a.fog + (b.fog - a.fog) * s,
+            a.snow + (b.snow - a.snow) * s};
 }

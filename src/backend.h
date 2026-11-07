@@ -44,6 +44,9 @@ private:
     QString m_state = "idle";
     qint64 m_elapsed = 0;
     double m_progress = 0;
+    // What the window was last told, so ticks too small to see go unannounced.
+    int m_shownRemaining = 0;
+    double m_shownProgress = 0;
     int m_seed = 1;
     QTimer m_timer;
     QElapsedTimer m_clock;

@@ -1,4 +1,4 @@
-QT += core gui qml quick quickcontrols2 dbus multimedia concurrent
+QT += core gui qml quick quickcontrols2 dbus multimedia concurrent network
 
 CONFIG += c++17 release
 TARGET = grove

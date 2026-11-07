@@ -9,14 +9,16 @@ Item {
     property real rain: 0
     property real ambient: 1
 
-    // One slow loop that every cloud drifts along at its own speed.
+    // Seconds of drift, which every cloud follows at its own speed. A timer
+    // moves them on fifteen times a second, plenty for clouds that take
+    // minutes to cross; an animation would redraw the whole window at the
+    // display's full rate to move each one a fraction of a pixel.
     property real drift: 0
-    NumberAnimation on drift {
-        from: 0
-        to: 1
-        duration: 600000
-        loops: Animation.Infinite
+    Timer {
+        interval: 66
+        repeat: true
         running: root.cover > 0.02
+        onTriggered: root.drift += interval / 1000
     }
 
     // The sky colour overhead. In low light a cloud is lit mostly by the sky,
@@ -54,7 +56,8 @@ Item {
             width: w
             height: w * 0.44
             y: root.height * (0.03 + 0.34 * b)
-            x: ((a + root.drift * speed) % 1) * (root.width + w) - w
+            // Crosses the sky `speed` times in ten minutes.
+            x: ((a + root.drift * speed / 600) % 1) * (root.width + w) - w
             // Cloud number i appears once the cover passes i of 9.
             opacity: Math.max(0, Math.min(1, root.cover * 9 - index)) * (0.7 + 0.3 * root.cover)
             Behavior on opacity { NumberAnimation { duration: 800 } }

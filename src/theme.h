@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QFileSystemWatcher>
+#include <QLocalSocket>
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
@@ -27,6 +28,7 @@ signals:
 private:
     void reload();
     void refreshRounding();
+    void askAgainIfPending();
 
     QString m_directory;
     QString m_accent = "#FFD60A";
@@ -35,5 +37,8 @@ private:
     QString m_hyprctl;
     int m_radius = 0;
     QProcess m_roundingProcess;
-    QTimer m_roundingPoll, m_roundingTimeout;
+    QTimer m_roundingTimeout;
+    bool m_roundingPending = false;
+    // Hyprland's event socket, which says when its config has been reloaded.
+    QLocalSocket m_events;
 };

@@ -16,7 +16,7 @@ class Weather : public QObject {
     Q_PROPERTY(double rain READ rain NOTIFY changed)
     Q_PROPERTY(double snow READ snow NOTIFY changed)
     Q_PROPERTY(double fog READ fog NOTIFY changed)
-    Q_PROPERTY(double growth READ growth NOTIFY changed)
+    Q_PROPERTY(double growth READ growth NOTIFY growthChanged)
 
 public:
     struct Conditions {
@@ -47,10 +47,14 @@ public:
     static QString pickKind(QRandomGenerator &random, const QString &season);
 
 signals:
+    // The sky (kind, season, cloud, rain, snow and fog), and the plant's
+    // growth, each on its own, so growing does not redraw the sky.
     void changed();
+    void growthChanged();
 
 private:
-    void refresh();
+    // The conditions at a point in the session.
+    Conditions at(double progress) const;
 
     QString m_forced;
     QString m_season = "summer";
