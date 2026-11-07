@@ -44,8 +44,8 @@ QByteArray FogHorn::synthesize(int rate) {
     QRandomGenerator noise(7);
     std::vector<double> out(static_cast<size_t>(kPhraseSeconds * rate), 0.0);
     // The call, then a higher, quieter, muffled answer from farther out.
-    addHorn(out, rate, 0.0, 3.2, 82.4, 1.0, 900, noise);
-    addHorn(out, rate, 3.6, 2.8, 98.0, 0.45, 450, noise);
+    addHorn(out, rate, 0.0, 3.2, 69.3, 1.0, 900, noise);
+    addHorn(out, rate, 3.6, 2.8, 82.4, 0.45, 450, noise);
 
     // Fog swallows sound; a soft echo gives the horn some air around it.
     const int delay = static_cast<int>(0.27 * rate);
