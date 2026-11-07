@@ -65,11 +65,11 @@ Item {
     ItemParticle {
         system: snowSystem
         delegate: Rectangle {
-            width: 3 + Math.random() * 5
+            width: 2 + Math.random() * 4
             height: width
             radius: width / 2
             color: root.ambient > 0.5 ? "#ffffff" : "#c9d6ee"
-            opacity: 0.55 + Math.random() * 0.4
+            opacity: 0.5 + Math.random() * 0.4
         }
     }
 
@@ -95,16 +95,19 @@ Item {
     }
     Repeater {
         model: 5
-        delegate: Rectangle {
+        // Stratus bands from the cloud painter, so the fog has no hard edges.
+        delegate: CloudShape {
             readonly property real a: Math.abs(Math.sin(index * 31.9 + 0.7))
-            readonly property real w: root.width * (0.5 + 0.4 * a)
+            readonly property real w: root.width * (0.6 + 0.4 * a)
+            // Seeds 1, 4, 7... are the long, low stratus kind.
+            seed: 1 + 3 * (index + 2)
+            tone: root.fogColor
+            shade: root.fogColor
             width: w
-            height: root.height * 0.07
-            radius: height / 2
-            y: root.height * (0.55 + 0.3 * ((index * 0.37) % 1))
+            height: w * 0.24
+            y: root.height * (0.5 + 0.34 * ((index * 0.37) % 1))
             x: ((a + root.drift * (4 + index * 2)) % 1) * (root.width + w) - w
-            color: root.fogColor
-            opacity: root.fog * 0.24
+            opacity: root.fog * 0.75
         }
     }
 }

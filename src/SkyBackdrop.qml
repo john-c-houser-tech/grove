@@ -109,6 +109,27 @@ Item {
         }
     }
 
+    // The land beyond the garden. It is lit like everything else: dimmed at
+    // night, warmed at dusk, greyed by weather, and hazier with distance.
+    Hills {
+        id: hills
+        anchors.fill: parent
+        horizon: root.horizon
+        // Winter snow reaches low; by summer only the highest peaks keep any.
+        snowline: weather.season === "winter" ? 0.42 : weather.season === "spring" ? 0.58
+                : weather.season === "autumn" ? 0.66 : 0.8
+        hazeColor: light.skyBottom
+        readonly property color weatherTint: Qt.rgba(0.42, 0.47, 0.52, Math.min(0.5, 0.2 * weather.cloud + 0.2 * weather.rain + 0.15 * weather.snow))
+        function lit(c, haze) {
+            return Qt.tint(Qt.tint(Qt.tint(Qt.tint(c, Qt.rgba(light.skyBottom.r, light.skyBottom.g, light.skyBottom.b, haze)),
+                                          weatherTint), light.nightTint), light.warmTint)
+        }
+        farColor: lit("#697d9a", 0.38)
+        midColor: lit("#44605a", 0.24)
+        nearColor: lit("#2f4a3a", 0.08)
+        snowColor: Qt.tint(Qt.tint(Qt.tint("#f4f7fb", weatherTint), light.nightTint), light.warmTint)
+    }
+
     Clouds {
         anchors.fill: parent
         opacity: 1 - 0.85 * weather.fog

@@ -1,11 +1,13 @@
 # Grove
 
-![Grove growing an autumn plant at dusk](docs/grove.png)
+![Grove growing an autumn plant under soft clouds](docs/grove.png)
 
 A focus timer that grows a plant while you work. Press Space to plant a seed.
 Stay with it for 25 minutes and the plant blooms; give up and it wilts. Either
 way it stays in your garden.
 
+- **A view.** Distant peaks wear snow in winter, with rolling ridges and a
+  hillside nearer in, each hazier with distance and lit like the rest.
 - **Light follows the clock.** Dawn, noon, golden hour and night, with dusk
   warming toward your Omarchy accent. Day length follows the calendar for a
   mid-northern latitude. There is no location lookup.
