@@ -1,7 +1,8 @@
 // The whole app, its real window drawn offscreen and driven by keys, as a user
 // would: nothing appears on the desktop, and the same run is what the leak
-// check watches. bin/test runs it on the offscreen platform with the GPU
-// renderer, so particles and textures are drawn as they are on screen.
+// check watches. main() below keeps it offscreen however it is started, and
+// draws with the GPU renderer, so particles and textures are drawn as they
+// are on screen.
 
 #include <QColor>
 #include <QDir>
@@ -357,5 +358,19 @@ private:
     const char *m_accent = "#FFD60A";
 };
 
-QTEST_MAIN(SceneTests)
+// Never on the desktop, however the program is started: the session's own
+// QT_QPA_PLATFORM (Omarchy sets wayland) is overridden. The renderer is the
+// GPU's, as on screen, unless one is named; bin/check-leaks names the software
+// renderer under Valgrind.
+int main(int argc, char *argv[]) {
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    if (!qEnvironmentVariableIsSet("QT_QUICK_BACKEND")) {
+        qputenv("QT_QUICK_BACKEND", "rhi");
+        qputenv("QSG_RHI_BACKEND", "opengl");
+    }
+    const QGuiApplication application(argc, argv);
+    SceneTests tests;
+    QTEST_SET_MAIN_SOURCE_PATH
+    return QTest::qExec(&tests, argc, argv);
+}
 #include "scene_tests.moc"
