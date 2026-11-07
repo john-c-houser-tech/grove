@@ -2,6 +2,12 @@
 Type=Application
 Name=Grove
 Comment=A focus timer that grows a plant while you work
+Comment[da]=En fokustimer, der får en plante til at gro, mens du arbejder
+Comment[de]=Ein Fokus-Timer, der beim Arbeiten eine Pflanze wachsen lässt
+Comment[es_MX]=Un temporizador de enfoque que hace crecer una planta mientras trabajas
+Comment[fr]=Un minuteur de concentration qui fait pousser une plante pendant que vous travaillez
+Comment[pt_BR]=Um temporizador de foco que faz uma planta crescer enquanto você trabalha
+Comment[ja]=作業中に植物を育てる集中タイマー
 Exec=grove
 Icon=grove
 Terminal=false

@@ -7,5 +7,11 @@
         <file alias="GardenView.qml">GardenView.qml</file>
         <file alias="Precipitation.qml">Precipitation.qml</file>
         <file alias="i18n/en.json">i18n/en.json</file>
+        <file alias="i18n/da.json">i18n/da.json</file>
+        <file alias="i18n/de.json">i18n/de.json</file>
+        <file alias="i18n/es-MX.json">i18n/es-MX.json</file>
+        <file alias="i18n/fr.json">i18n/fr.json</file>
+        <file alias="i18n/pt-BR.json">i18n/pt-BR.json</file>
+        <file alias="i18n/ja.json">i18n/ja.json</file>
     </qresource>
 </RCC>

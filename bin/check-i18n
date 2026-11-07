@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Checks that every catalog translates every string the app shows."""
+import glob, json, os, re, sys
+
+root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+source = ""
+for path in glob.glob(os.path.join(root, "src", "*.qml")) + glob.glob(os.path.join(root, "src", "*.cpp")):
+    source += open(path, encoding="utf-8").read()
+strings = set(re.findall(r'(?:qsTr|tr)\("((?:[^"\\]|\\.)*)"', source))
+
+failed = False
+for path in sorted(glob.glob(os.path.join(root, "src", "i18n", "*.json"))):
+    code = os.path.basename(path)[:-5]
+    if code == "en":
+        continue
+    catalog = json.load(open(path, encoding="utf-8"))
+    missing = sorted(s for s in strings if s not in catalog)
+    stale = sorted(k for k in catalog if k not in strings)
+    for s in missing:
+        print(f"{code}: missing: {s}")
+    for s in stale:
+        print(f"{code}: unused: {s}")
+    failed = failed or bool(missing or stale)
+print("catalogs complete" if not failed else "catalogs need work")
+sys.exit(1 if failed else 0)
