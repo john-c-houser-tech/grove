@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QAudioDevice>
 #include <QAudioSink>
 #include <QBuffer>
 #include <QByteArray>
@@ -10,6 +11,8 @@
 #include <QTimer>
 #include <functional>
 #include <list>
+
+#include "problem.h"
 
 // Faint sounds from far away while a plant grows. At night a train approaches
 // a crossing, one to three times in a session; by day a small plane flies
@@ -31,7 +34,7 @@ public:
     bool muted() const { return m_muted; }
     void setMuted(bool muted);
     // Empty when sound works, otherwise why it cannot (shown in the window).
-    QString problem() const { return m_problem; }
+    QString problem() const { return m_problem.text(); }
 
     // "night", "day", or empty at dawn and dusk, when nothing happens.
     void setPeriodSource(std::function<QString()> period) { m_period = std::move(period); }
@@ -74,13 +77,13 @@ private:
     // Shows what goes with the sound, starting together with it.
     void showVisual(const QString &kind);
     void prepare(const QString &kind);
-    void setProblem(const QString &problem);
+    void setProblem(Problem::Words words);
 
     bool m_persist;
     bool m_muted = false;
     double m_volumeScale = 1;
     QString m_forced;
-    QString m_problem;
+    Problem m_problem;
     std::function<QString()> m_period;
     std::function<bool()> m_flightWeatherOk;
     std::list<QTimer> m_timers;
@@ -88,6 +91,8 @@ private:
     QByteArray m_playing;
     QBuffer m_buffer;
     QAudioSink *m_sink = nullptr;
+    // The output the sink was made for.
+    QAudioDevice m_sinkDevice;
     // Counts sessions, so a sound still waiting to be made when its session
     // ends is not played in the next.
     int m_session = 0;

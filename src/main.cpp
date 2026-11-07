@@ -86,8 +86,10 @@ int main(int argc, char *argv[]) {
 
     // GROVE_GARDEN points the garden at another file. A shortened test session
     // (GROVE_SECONDS) is not saved unless it does, so trying the app out never
-    // adds make-believe plants to the real garden.
-    const bool shortened = qEnvironmentVariableIsSet("GROVE_SECONDS");
+    // adds make-believe plants to the real garden. A GROVE_SECONDS that is
+    // empty, not a number, or the full 25 minutes runs a real session, and is
+    // saved like one.
+    const bool shortened = backend.seconds() != 25 * 60;
     Garden garden(qEnvironmentVariable("GROVE_GARDEN"));
     const bool saving = !shortened || qEnvironmentVariableIsSet("GROVE_GARDEN");
     // A new session rolls new weather; the plant's progress carries it along.
@@ -122,6 +124,11 @@ int main(int argc, char *argv[]) {
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
+    // Problems reported from C++ are put into words when shown, so asking the
+    // window to show them again puts them in the new language.
+    QObject::connect(&translator, &Translator::changed, &garden, &Garden::problemChanged);
+    QObject::connect(&translator, &Translator::changed, &notifier, &Notifier::problemChanged);
+    QObject::connect(&translator, &Translator::changed, &sounds, &Sounds::problemChanged);
     engine.rootContext()->setContextProperty("translator", &translator);
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);

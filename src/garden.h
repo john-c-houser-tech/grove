@@ -5,6 +5,8 @@
 #include <QString>
 #include <vector>
 
+#include "problem.h"
+
 // Every plant that was finished or wilted, kept in one small JSON file so the
 // garden fills up over days. The model lists the newest plant first.
 class Garden : public QAbstractListModel {
@@ -40,7 +42,7 @@ public:
     // Time spent on plants that grew to the end; a wilted plant earns none.
     int focusedMinutes() const { return m_focused; }
     // Empty when the garden is fine, otherwise why it cannot be read or saved.
-    QString problem() const { return m_problem; }
+    QString problem() const { return m_problem.text(); }
 
     void record(const Plant &plant);
 
@@ -56,14 +58,14 @@ private:
     Read read(std::vector<Plant> &plants) const;
     void load();
     bool save();
-    void setProblem(const QString &problem);
+    void setProblem(Problem::Words words);
     void recount();
 
     QString m_path;
     // Newest first.
     std::vector<Plant> m_plants;
     int m_grown = 0, m_wilted = 0, m_focused = 0;
-    QString m_problem;
+    Problem m_problem;
     // A file that could not be read is left exactly as it is, so nothing is
     // saved over it.
     bool m_readOnly = false;

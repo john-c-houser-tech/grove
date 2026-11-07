@@ -656,6 +656,28 @@ private slots:
         QVERIFY(translator.translate("Main", "Quit").isNull());
     }
 
+    void problemsFromCppFollowTheLanguage()
+    {
+        QTemporaryDir dir;
+        const QByteArray message =
+            "The garden file could not be read. It was left untouched, and new plants will not be saved.";
+        write(dir.path() + "/language", "de\n");
+        write(dir.path() + "/de.json", "{\"" + message + "\": \"Deutsch\"}");
+        write(dir.path() + "/fr.json", "{\"" + message + "\": \"Français\"}");
+        Translator translator(dir.path() + "/language", dir.path());
+        QCoreApplication::installTranslator(&translator);
+        write(dir.path() + "/garden.json", "this is not json");
+        Garden garden(dir.path() + "/garden.json");
+        // As main() does: a new language asks for every problem again.
+        QObject::connect(&translator, &Translator::changed, &garden, &Garden::problemChanged);
+        QCOMPARE(garden.problem(), QString("Deutsch"));
+        QSignalSpy asked(&garden, &Garden::problemChanged);
+        write(dir.path() + "/language", "fr\n");
+        QTRY_COMPARE(garden.problem(), QString("Français"));
+        QVERIFY(asked.count() >= 1);
+        QCoreApplication::removeTranslator(&translator);
+    }
+
     void translatorFollowsTheLanguageFile()
     {
         QTemporaryDir dir;

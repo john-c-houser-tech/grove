@@ -77,6 +77,7 @@ Rectangle {
             cellHeight: cellWidth + 34
 
             delegate: Item {
+                id: tile
                 width: grid.cellWidth
                 height: grid.cellHeight
 
@@ -85,7 +86,8 @@ Rectangle {
                     anchors.margins: 6
                     radius: theme.radius
                     color: "#161d19"
-                    border.color: GridView.isCurrentItem && grid.activeFocus ? theme.accent : "#222c26"
+                    // The view sets isCurrentItem on the delegate itself, not on what is inside it.
+                    border.color: tile.GridView.isCurrentItem && grid.activeFocus ? theme.accent : "#222c26"
                     border.width: 1
 
                     Rectangle {

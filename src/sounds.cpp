@@ -10,12 +10,12 @@
 #include <cmath>
 #include <vector>
 
+#include "easing.h"
+
 namespace {
 
 constexpr double kTrainSeconds = 44.0;
 constexpr double kPlaneSeconds = 30.0;
-
-double clamp(double v, double lo = 0, double hi = 1) { return std::max(lo, std::min(hi, v)); }
 
 // A one-pole low-pass filter: air takes the highs out of far-off sound.
 struct LowPass {
@@ -39,7 +39,7 @@ void addBlast(std::vector<double> &out, int rate, double start, double seconds, 
         const double t = start + static_cast<double>(i) / rate;
         // The horn is sharp as the train closes in and flat once it has gone by.
         const double doppler = 1 + 0.04 * std::tanh((pass - t) / 6.0);
-        const double envelope = clamp((t - start) / 0.1) * clamp((start + seconds - t) / 0.22);
+        const double envelope = clamp01((t - start) / 0.1) * clamp01((start + seconds - t) / 0.22);
         double sample = 0;
         for (int n = 0; n < 3; ++n) {
             phase[n] += 2 * M_PI * notes[n] * detune[n] * doppler / rate;
@@ -138,7 +138,7 @@ QByteArray Sounds::synthesizeTrain(int rate) {
     // Fade in from nothing and out to nothing, with no click at either end.
     for (size_t i = 0; i < out.size(); ++i) {
         const double t = static_cast<double>(i) / rate;
-        out[i] *= clamp(t / 1.5) * clamp((kTrainSeconds - t) / 3.0);
+        out[i] *= clamp01(t / 1.5) * clamp01((kTrainSeconds - t) / 3.0);
     }
     return toPcm(out, 0.6);
 }
@@ -171,7 +171,7 @@ QByteArray Sounds::synthesizePlane(int rate) {
     }
     for (size_t i = 0; i < out.size(); ++i) {
         const double t = static_cast<double>(i) / rate;
-        out[i] *= clamp(t / 2.0) * clamp((kPlaneSeconds - t) / 3.0);
+        out[i] *= clamp01(t / 2.0) * clamp01((kPlaneSeconds - t) / 3.0);
     }
     // Much fainter than the train: this is a plane very far up.
     return toPcm(out, 0.13);
@@ -226,7 +226,7 @@ Sounds::Sounds(bool persist, const QString &forcedKind, QObject *parent)
     bool ok = false;
     const double scale = qEnvironmentVariable("GROVE_SOUND_VOLUME").toDouble(&ok);
     if (ok)
-        m_volumeScale = clamp(scale);
+        m_volumeScale = clamp01(scale);
 }
 
 Sounds::~Sounds() {
@@ -248,11 +248,9 @@ void Sounds::setMuted(bool muted) {
     emit mutedChanged();
 }
 
-void Sounds::setProblem(const QString &problem) {
-    if (problem == m_problem)
-        return;
-    m_problem = problem;
-    emit problemChanged();
+void Sounds::setProblem(Problem::Words words) {
+    if (m_problem.set(std::move(words)))
+        emit problemChanged();
 }
 
 void Sounds::prepare(const QString &kind) {
@@ -356,10 +354,17 @@ void Sounds::play(const QString &kind, int retries) {
             showVisual(kind);
         return;
     }
+    // The default output can change while Grove stays open: headphones, a
+    // Bluetooth headset, a dock. A sink made for the old one is let go.
+    const QAudioDevice device = QMediaDevices::defaultAudioOutput();
+    if (m_sink && device != m_sinkDevice) {
+        m_sink->stop();
+        delete m_sink;
+        m_sink = nullptr;
+    }
     if (!m_sink) {
-        const QAudioDevice device = QMediaDevices::defaultAudioOutput();
         if (device.isNull()) {
-            setProblem(tr("No audio output found, so the distant sounds are silent."));
+            setProblem([] { return tr("No audio output found, so the distant sounds are silent."); });
             showVisual(kind);
             return;
         }
@@ -368,11 +373,17 @@ void Sounds::play(const QString &kind, int retries) {
         format.setChannelCount(1);
         format.setSampleFormat(QAudioFormat::Int16);
         if (!device.isFormatSupported(format)) {
-            setProblem(tr("The audio output cannot play 16-bit sound, so the distant sounds are silent."));
+            setProblem([] { return tr("The audio output cannot play 16-bit sound, so the distant sounds are silent."); });
             showVisual(kind);
             return;
         }
         m_sink = new QAudioSink(device, format, this);
+        m_sinkDevice = device;
+        // An output that goes away mid-sound stops it with an error.
+        connect(m_sink, &QAudioSink::stateChanged, this, [this, sink = m_sink](QAudio::State state) {
+            if (state == QAudio::StoppedState && sink->error() != QAudio::NoError)
+                setProblem([] { return tr("The audio output could not be used, so the distant sounds are silent."); });
+        });
     }
     setProblem({});
     m_fade.stop();
@@ -385,4 +396,6 @@ void Sounds::play(const QString &kind, int retries) {
     // never leaves them out of step.
     showVisual(kind);
     m_sink->start(&m_buffer);
+    if (m_sink->error() != QAudio::NoError)
+        setProblem([] { return tr("The audio output could not be used, so the distant sounds are silent."); });
 }

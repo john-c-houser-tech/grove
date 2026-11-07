@@ -45,11 +45,9 @@ QHash<int, QByteArray> Garden::roleNames() const {
             {ProgressRole, "progress"}, {WhenRole, "when"}, {MinutesRole, "minutes"}};
 }
 
-void Garden::setProblem(const QString &problem) {
-    if (problem == m_problem)
-        return;
-    m_problem = problem;
-    emit problemChanged();
+void Garden::setProblem(Problem::Words words) {
+    if (m_problem.set(std::move(words)))
+        emit problemChanged();
 }
 
 void Garden::recount() {
@@ -104,11 +102,11 @@ void Garden::load() {
         return;
     case Read::Unreadable:
         m_readOnly = true;
-        setProblem(tr("Could not open the garden file, so new plants will not be saved."));
+        setProblem([] { return tr("Could not open the garden file, so new plants will not be saved."); });
         return;
     case Read::Invalid:
         m_readOnly = true;
-        setProblem(tr("The garden file could not be read. It was left untouched, and new plants will not be saved."));
+        setProblem([] { return tr("The garden file could not be read. It was left untouched, and new plants will not be saved."); });
         return;
     case Read::Ok:
         break;
@@ -141,7 +139,7 @@ bool Garden::save() {
     // never leaves half a garden.
     QSaveFile file(m_path);
     if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(root).toJson()) < 0 || !file.commit()) {
-        setProblem(tr("Could not save the garden: %1").arg(file.errorString()));
+        setProblem([why = file.errorString()] { return tr("Could not save the garden: %1").arg(why); });
         return false;
     }
     setProblem({});
@@ -161,7 +159,7 @@ void Garden::record(const Plant &plant) {
     }
     if (!QDir().mkpath(QFileInfo(m_path).absolutePath())) {
         keepUnsaved();
-        setProblem(tr("Could not create the garden folder, so this plant was not saved."));
+        setProblem([] { return tr("Could not create the garden folder, so this plant was not saved."); });
         return;
     }
     // Another Grove may be open on the same garden. Only one saves at a time,
@@ -170,7 +168,7 @@ void Garden::record(const Plant &plant) {
     QLockFile lock(m_path + ".lock");
     if (!lock.tryLock(5000)) {
         keepUnsaved();
-        setProblem(tr("Another Grove kept the garden busy, so this plant was not saved."));
+        setProblem([] { return tr("Another Grove kept the garden busy, so this plant was not saved."); });
         return;
     }
     std::vector<Plant> plants;
@@ -185,7 +183,7 @@ void Garden::record(const Plant &plant) {
         // Changed into something that cannot be read since: leave it be.
         m_readOnly = true;
         keepUnsaved();
-        setProblem(tr("The garden file could not be read. It was left untouched, and new plants will not be saved."));
+        setProblem([] { return tr("The garden file could not be read. It was left untouched, and new plants will not be saved."); });
         return;
     }
     plants.insert(plants.begin(), plant);

@@ -37,5 +37,7 @@
   "No audio output found, so the distant sounds are silent.": "Nenhuma saída de áudio encontrada, então os sons distantes estão silenciosos.",
   "The audio output cannot play 16-bit sound, so the distant sounds are silent.": "A saída de áudio não consegue reproduzir som de 16 bits, então os sons distantes estão silenciosos.",
   "Sounds are off. M turns them on.": "Os sons estão desligados. M os liga.",
-  "Mute or unmute distant sounds": "Silenciar ou ativar os sons distantes"
+  "Mute or unmute distant sounds": "Silenciar ou ativar os sons distantes",
+  "Another Grove kept the garden busy, so this plant was not saved.": "Outro Grove estava usando o jardim, então esta planta não foi salva.",
+  "The audio output could not be used, so the distant sounds are silent.": "Não foi possível usar a saída de áudio, então os sons distantes estão silenciosos."
 }

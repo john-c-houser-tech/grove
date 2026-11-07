@@ -36,5 +36,7 @@
   "No audio output found, so the distant sounds are silent.": "Ingen lydudgang fundet, så de fjerne lyde er tavse.",
   "The audio output cannot play 16-bit sound, so the distant sounds are silent.": "Lydudgangen kan ikke afspille 16-bit lyd, så de fjerne lyde er tavse.",
   "Sounds are off. M turns them on.": "Lyden er slået fra. M slår den til.",
-  "Mute or unmute distant sounds": "Slå fjerne lyde fra eller til"
+  "Mute or unmute distant sounds": "Slå fjerne lyde fra eller til",
+  "Another Grove kept the garden busy, so this plant was not saved.": "En anden Grove holdt haven optaget, så denne plante blev ikke gemt.",
+  "The audio output could not be used, so the distant sounds are silent.": "Lydudgangen kunne ikke bruges, så de fjerne lyde er tavse."
 }

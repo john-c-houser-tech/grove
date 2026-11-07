@@ -5,14 +5,9 @@
 #include <utility>
 #include <vector>
 
+#include "easing.h"
+
 namespace {
-
-double clamp(double v, double lo = 0, double hi = 1) { return std::max(lo, std::min(hi, v)); }
-
-double smoothstep(double a, double b, double x) {
-    const double t = clamp((x - a) / (b - a));
-    return t * t * (3 - 2 * t);
-}
 
 QColor mix(const QColor &a, const QColor &b, double t) {
     return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t,
@@ -84,7 +79,7 @@ Sky Light::sky(const QDateTime &when, const QColor &accent) {
     s.top = along(stops, s.elevation, true);
     s.bottom = along(stops, s.elevation, false);
     s.ambient = 0.22 + 0.78 * smoothstep(-0.12, 0.3, s.elevation);
-    s.stars = clamp((-s.elevation - 0.02) / 0.2);
+    s.stars = clamp01((-s.elevation - 0.02) / 0.2);
     const double d = (s.elevation - 0.04) / 0.12;
     s.warmth = qExp(-d * d);
     s.warmTint = warm;
@@ -102,7 +97,7 @@ Light::Light(const QDateTime &fixed, QObject *parent) : QObject(parent), m_fixed
 
 QColor Light::warmTint() const {
     QColor c = m_sky.warmTint;
-    c.setAlphaF(clamp(m_sky.warmth * 0.2));
+    c.setAlphaF(clamp01(m_sky.warmth * 0.2));
     return c;
 }
 

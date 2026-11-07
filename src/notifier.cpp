@@ -9,11 +9,9 @@
 
 Notifier::Notifier(const QString &service, QObject *parent) : QObject(parent), m_service(service) {}
 
-void Notifier::setProblem(const QString &problem) {
-    if (problem == m_problem)
-        return;
-    m_problem = problem;
-    emit problemChanged();
+void Notifier::setProblem(Problem::Words words) {
+    if (m_problem.set(std::move(words)))
+        emit problemChanged();
 }
 
 void Notifier::plantGrown() {
@@ -23,7 +21,7 @@ void Notifier::plantGrown() {
 void Notifier::send(const QString &summary, const QString &body) {
     QDBusConnection bus = QDBusConnection::sessionBus();
     if (!bus.isConnected()) {
-        setProblem(tr("No desktop session bus, so Grove cannot send notifications."));
+        setProblem([] { return tr("No desktop session bus, so Grove cannot send notifications."); });
         return;
     }
     QDBusMessage message = QDBusMessage::createMethodCall(m_service, "/org/freedesktop/Notifications",
@@ -37,7 +35,7 @@ void Notifier::send(const QString &summary, const QString &body) {
     connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
         const QDBusPendingReply<unsigned> reply = *call;
         if (reply.isError()) {
-            setProblem(tr("No notification service is running, so Grove cannot tell you when a plant is done."));
+            setProblem([] { return tr("No notification service is running, so Grove cannot tell you when a plant is done."); });
         } else {
             m_lastId = reply.value();
             setProblem({});

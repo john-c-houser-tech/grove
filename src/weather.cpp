@@ -3,12 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
-namespace {
+#include "easing.h"
 
-double smoothstep(double a, double b, double x) {
-    const double t = std::max(0.0, std::min(1.0, (x - a) / (b - a)));
-    return t * t * (3 - 2 * t);
-}
+namespace {
 
 bool known(const QString &kind) {
     return kind == "clear" || kind == "cloudy" || kind == "rain" || kind == "snow" || kind == "fog";

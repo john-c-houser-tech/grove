@@ -6,6 +6,7 @@ TEMPLATE = app
 
 HEADERS += \
     src/backend.h \
+    src/easing.h \
     src/field.h \
     src/hills.h \
     src/layer.h \
@@ -16,6 +17,7 @@ HEADERS += \
     src/sounds.h \
     src/garden.h \
     src/notifier.h \
+    src/problem.h \
     src/theme.h \
     src/translator.h
 
