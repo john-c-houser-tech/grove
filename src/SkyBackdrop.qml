@@ -124,6 +124,9 @@ Item {
         readonly property color farColor: lit("#697d9a", 0.38)
         readonly property color midColor: lit("#44605a", 0.24)
         readonly property color nearColor: lit("#2f4a3a", 0.08)
+        // The valley floor the railway runs along, between the ridges and the
+        // near hills.
+        readonly property color floorColor: lit("#56704c", 0.16)
         readonly property color snowColor: Qt.tint(Qt.tint(Qt.tint("#f4f7fb", weatherTint), light.nightTint), light.warmTint)
     }
 
@@ -139,17 +142,22 @@ Item {
         snowColor: look.snowColor
     }
 
-    // The night train runs along the plain, behind the nearest hillside.
+    // The railway across the valley, and the night train on it, between the
+    // ridges and the near hills.
     Train {
         id: train
         objectName: "train"
         anchors.fill: parent
         horizon: root.horizon
         carColor: Qt.darker(look.midColor, 2.2)
+        floorColor: look.floorColor
+        ballastColor: Qt.darker(look.floorColor, 1.35)
+        roadColor: Qt.tint(look.floorColor, Qt.rgba(0.62, 0.55, 0.42, 0.45))
+        railColor: Qt.tint(look.floorColor, Qt.rgba(light.skyBottom.r, light.skyBottom.g, light.skyBottom.b, 0.55))
     }
     Connections {
         target: sounds
-        function onTrainPassing(direction, milliseconds, crossing) { train.go(direction, milliseconds, crossing) }
+        function onTrainPassing(milliseconds) { train.go(milliseconds) }
     }
 
     Hills {

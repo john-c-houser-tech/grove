@@ -18,8 +18,10 @@ way it stays in your garden.
 - **Distant sounds.** Only while a plant is growing, and always faint. At
   night a train now and then approaches a crossing, with its horn, the bells
   and the rumble of the rails, one to three times in a session. You can see it
-  too: a headlight and rows of lit windows slide along the plain behind the
-  nearest hill, and the crossing lamps flash in turn with the bells. By day a
+  too: a headlight and rows of lit windows come out from behind the hill on
+  the right, run along the track across the valley and go in behind the hill
+  on the left. The level crossing stands there day and night, and its lamps
+  flash in turn with the bells. By day a
   small plane flies over now and then, crossing the sky while its engine drones
   very far off. All of it is synthesized and drawn at start-up, so nothing is
   shipped or downloaded. M mutes the sound (the picture stays).

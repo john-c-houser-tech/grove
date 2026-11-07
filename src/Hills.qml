@@ -59,9 +59,11 @@ Canvas {
         return H * (0.035 + 0.15 * noise(u * 2.6 + 5, 4)) + H * 0.025 * noise(u * 8.2, 5)
     }
     function near(u, H) {
-        // A hillside that climbs toward the left edge and settles to meadow.
-        var slope = Math.pow(1 - u, 2.2)
-        return H * (0.025 + 0.1 * slope) + H * 0.012 * noise(u * 6.5 + 2, 6)
+        // Two hills, one at each edge, with a low meadow between them. The
+        // railway runs behind them, so a train comes out from behind one and
+        // goes in behind the other.
+        var left = Math.pow(1 - u, 3), right = Math.pow(u, 3)
+        return H * (0.008 + 0.12 * left + 0.11 * right) + H * 0.012 * noise(u * 6.5 + 2, 6)
     }
 
     function paintRidge(ctx, heightAt, top, base, color, mist) {

@@ -60,10 +60,8 @@ signals:
     // A plane crosses the sky: direction is 1 for left to right and -1 for the
     // other way, and altitude from 0 to 1 is how high it flies.
     void planeFlyover(int direction, int milliseconds, double altitude);
-    // A train runs along the plain to a crossing: direction as for the plane,
-    // and crossing is how far along from the edge it entered, from 0 to 1, that
-    // the crossing lies. The flight times itself to the sound.
-    void trainPassing(int direction, int milliseconds, double crossing);
+    // A train runs across the valley, timed to the sound that lasts this long.
+    void trainPassing(int milliseconds);
 
 private:
     void fire(const QString &kind);

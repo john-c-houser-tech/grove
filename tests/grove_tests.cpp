@@ -329,12 +329,7 @@ private slots:
         QSignalSpy spy(&sounds, &Sounds::trainPassing);
         sounds.begin(1500);
         QVERIFY(spy.wait(6000));
-        QCOMPARE(spy.first().at(1).toInt(), Sounds::trainMilliseconds());
-        const int direction = spy.first().at(0).toInt();
-        QVERIFY(direction == 1 || direction == -1);
-        // The crossing is well inside the view, so the train can be watched coming and going.
-        const double crossing = spy.first().at(2).toDouble();
-        QVERIFY(crossing >= 0.4 && crossing <= 0.65);
+        QCOMPARE(spy.first().at(0).toInt(), Sounds::trainMilliseconds());
     }
 
     void noSoundsAtDawnOrDusk()

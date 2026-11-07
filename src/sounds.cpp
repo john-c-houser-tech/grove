@@ -307,14 +307,12 @@ void Sounds::fire(const QString &kind) {
 }
 
 void Sounds::showVisual(const QString &kind) {
-    QRandomGenerator *random = QRandomGenerator::global();
-    const int direction = random->bounded(2) ? 1 : -1;
-    if (kind == "plane")
-        emit planeFlyover(direction, planeMilliseconds(), random->generateDouble());
-    else
-        // The crossing sits well inside the view, so there is time to watch the
-        // train come and to see it go.
-        emit trainPassing(direction, trainMilliseconds(), 0.4 + 0.25 * random->generateDouble());
+    if (kind == "plane") {
+        QRandomGenerator *random = QRandomGenerator::global();
+        emit planeFlyover(random->bounded(2) ? 1 : -1, planeMilliseconds(), random->generateDouble());
+    } else {
+        emit trainPassing(trainMilliseconds());
+    }
 }
 
 void Sounds::play(const QString &kind, int retries) {
