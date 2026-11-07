@@ -130,6 +130,16 @@ Item {
         snowColor: Qt.tint(Qt.tint(Qt.tint("#f4f7fb", weatherTint), light.nightTint), light.warmTint)
     }
 
+    Plane {
+        id: plane
+        anchors.fill: parent
+        bodyColor: Qt.tint("#2a3441", Qt.rgba(light.skyBottom.r, light.skyBottom.g, light.skyBottom.b, 0.25))
+    }
+    Connections {
+        target: sounds
+        function onPlaneFlyover(direction, milliseconds, altitude) { plane.fly(direction, milliseconds, altitude) }
+    }
+
     Clouds {
         anchors.fill: parent
         opacity: 1 - 0.85 * weather.fog

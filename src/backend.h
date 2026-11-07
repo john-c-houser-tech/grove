@@ -12,6 +12,7 @@ class Backend : public QObject {
     Q_PROPERTY(double progress READ progress NOTIFY progressChanged)
     Q_PROPERTY(int remaining READ remaining NOTIFY progressChanged)
     Q_PROPERTY(int minutes READ minutes CONSTANT)
+    Q_PROPERTY(int seconds READ seconds CONSTANT)
     Q_PROPERTY(int seed READ seed NOTIFY stateChanged)
 
 public:
@@ -23,6 +24,7 @@ public:
     double progress() const { return m_progress; }
     int remaining() const;
     int minutes() const { return m_seconds / 60; }
+    int seconds() const { return m_seconds; }
     int seed() const { return m_seed; }
 
     Q_INVOKABLE void start();

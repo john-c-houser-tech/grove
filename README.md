@@ -15,9 +15,12 @@ way it stays in your garden.
   fog, and snow in winter only), weighted by the season, and it can change part-way through. Rain
   nudges growth along a little. Leaves are green, then autumn colours, then
   bare and frosted in winter. The weather is invented, never fetched.
-- **Fog horns.** In fog a deep horn sounds now and then, with a quieter answer
-  from farther out. It is synthesized at start-up, so nothing is shipped or
-  downloaded. M mutes it.
+- **Distant sounds.** Only while a plant is growing, and always faint. At
+  night a train now and then approaches a crossing, with its horn, the bells
+  and the rumble of the rails, one to three times in a session. By day a small
+  plane flies over now and then; you can see it cross the sky while its engine
+  drones very far off. Both are synthesized at start-up, so nothing is shipped
+  or downloaded. M mutes the sound (the plane still flies).
 - **A garden.** Every finished or wilted plant is kept, and G shows them all.
 - **A nudge when it is done.** A desktop notification tells you the plant is
   fully grown, even if Grove is buried under other windows. Your shell's
@@ -32,7 +35,7 @@ way it stays in your garden.
 |-------|--------------------------|
 | Space | Plant a seed, or give up |
 | G     | Show or hide the garden  |
-| M     | Mute or unmute fog horns |
+| M     | Mute or unmute sounds    |
 | ?     | Show the keys            |
 | Q     | Quit                     |
 
@@ -68,6 +71,8 @@ window, and does not save over it.
 | `GROVE_DATE=2026-10-20` | Pin the date, and so the season. |
 | `GROVE_WEATHER=fog` | Pin the weather: `clear`, `cloudy`, `rain`, `snow` or `fog`. |
 | `GROVE_GARDEN=/path/garden.json` | Use another garden file. |
+| `GROVE_SOUND_TEST=train` | Make a `train` or a `plane` happen a few seconds into the next session, whatever the hour. |
+| `GROVE_SOUND_VOLUME=0.5` | Scale the volume from 0 to 1. |
 
 ## License
 

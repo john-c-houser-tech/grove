@@ -1,4 +1,4 @@
-QT += core gui qml quick quickcontrols2 dbus multimedia
+QT += core gui qml quick quickcontrols2 dbus multimedia concurrent
 
 CONFIG += c++17 release
 TARGET = grove
@@ -8,7 +8,7 @@ HEADERS += \
     src/backend.h \
     src/light.h \
     src/weather.h \
-    src/foghorn.h \
+    src/sounds.h \
     src/garden.h \
     src/notifier.h \
     src/theme.h \
@@ -19,7 +19,7 @@ SOURCES += \
     src/backend.cpp \
     src/light.cpp \
     src/weather.cpp \
-    src/foghorn.cpp \
+    src/sounds.cpp \
     src/garden.cpp \
     src/notifier.cpp \
     src/theme.cpp \

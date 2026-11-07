@@ -11,10 +11,10 @@
 #include <QUrl>
 
 #include "backend.h"
-#include "foghorn.h"
 #include "garden.h"
 #include "light.h"
 #include "notifier.h"
+#include "sounds.h"
 #include "theme.h"
 #include "translator.h"
 #include "weather.h"
@@ -22,7 +22,7 @@
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName("grove");
-    app.setApplicationVersion("0.2.1");
+    app.setApplicationVersion("0.3.0");
 
     // Matches the window to grove.desktop, so the compositor (Wayland app_id)
     // and the launcher pick up the installed icon.
@@ -55,7 +55,17 @@ int main(int argc, char *argv[]) {
 
     Weather weather(qEnvironmentVariable("GROVE_WEATHER"));
     weather.begin(1 + QRandomGenerator::global()->bounded(1 << 30), today);
-    FogHorn horn;
+    // GROVE_SOUND_TEST=train or plane makes that sound happen a few seconds into
+    // the next session, whatever the hour.
+    Sounds sounds(true, qEnvironmentVariable("GROVE_SOUND_TEST"));
+    sounds.setPeriodSource([&]() -> QString {
+        if (light.sunUp() && light.ambient() > 0.6)
+            return "day";
+        if (!light.sunUp() && light.ambient() < 0.35)
+            return "night";
+        return {};
+    });
+    sounds.setFlightWeatherOk([&] { return weather.rain() < 0.25 && weather.snow() < 0.25 && weather.fog() < 0.35; });
     Notifier notifier;
 
     // GROVE_GARDEN points the garden at another file. A shortened test session
@@ -65,11 +75,13 @@ int main(int argc, char *argv[]) {
     Garden garden(qEnvironmentVariable("GROVE_GARDEN"));
     const bool saving = !shortened || qEnvironmentVariableIsSet("GROVE_GARDEN");
     // A new session rolls new weather; the plant's progress carries it along.
-    auto updateHorn = [&] { horn.setActive(backend.state() == "growing" && weather.fog() > 0.5); };
     QObject::connect(&backend, &Backend::stateChanged, &weather, [&] {
         if (backend.state() == "growing")
             weather.begin(backend.seed(), today);
-        updateHorn();
+        if (backend.state() == "growing")
+            sounds.begin(backend.seconds());
+        else
+            sounds.end();
         // A shortened test session stays quiet too, like it stays out of the garden.
         if (backend.state() == "done" && saving)
             notifier.plantGrown();
@@ -86,7 +98,6 @@ int main(int argc, char *argv[]) {
         }
     });
     QObject::connect(&backend, &Backend::progressChanged, &weather, [&] { weather.setProgress(backend.progress()); });
-    QObject::connect(&weather, &Weather::changed, &horn, updateHorn);
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
@@ -95,7 +106,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("light", &light);
     engine.rootContext()->setContextProperty("weather", &weather);
-    engine.rootContext()->setContextProperty("horn", &horn);
+    engine.rootContext()->setContextProperty("sounds", &sounds);
     engine.rootContext()->setContextProperty("garden", &garden);
     engine.rootContext()->setContextProperty("notifier", &notifier);
     engine.load(QUrl("qrc:/Main.qml"));

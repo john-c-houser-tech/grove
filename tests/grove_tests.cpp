@@ -4,10 +4,10 @@
 #include <QtTest>
 
 #include "backend.h"
-#include "foghorn.h"
 #include "garden.h"
 #include "light.h"
 #include "notifier.h"
+#include "sounds.h"
 #include "theme.h"
 #include "translator.h"
 #include "weather.h"
@@ -225,37 +225,110 @@ private slots:
         }
     }
 
-    void fogHornPhraseIsAudibleAndShaped()
+    void trainFillsItsLengthAndFadesInAndOut()
     {
-        const QByteArray pcm = FogHorn::synthesize(44100);
-        QCOMPARE(pcm.size(), 9 * 44100 * 2);
-        const auto *samples = reinterpret_cast<const qint16 *>(pcm.constData());
-        int peak = 0, early = 0;
-        for (int i = 0; i < pcm.size() / 2; ++i) {
-            peak = qMax(peak, qAbs(int(samples[i])));
-            if (i < 200)
-                early = qMax(early, qAbs(int(samples[i])));
-        }
-        QVERIFY(peak > 20000);
-        // The horn swells in rather than clicking on.
-        QVERIFY(early < 500);
+        const QByteArray pcm = Sounds::synthesizeTrain(44100);
+        QCOMPARE(pcm.size(), Sounds::trainMilliseconds() / 1000 * 44100 * 2);
+        QVERIFY(peakOf(pcm, 0, 44100 * 44) > 15000);
+        // No click at either end.
+        QVERIFY(peakOf(pcm, 0, 200) < 300);
+        QVERIFY(peakOf(pcm, pcm.size() / 2 - 200, pcm.size() / 2) < 300);
     }
 
-    void fogHornGapsStayWithinRange()
+    void trainHornsAreLoudestAsItArrives()
     {
-        QRandomGenerator random(3);
+        const QByteArray pcm = Sounds::synthesizeTrain(44100);
+        // The first signal is far off, the second close, and the rails alone are quiet.
+        const double rails = rmsOf(pcm, 0.5, 2.5), far = rmsOf(pcm, 3.2, 5.2), close = rmsOf(pcm, 16.2, 18.2);
+        QVERIFY(far > rails * 2);
+        QVERIFY(close > far * 1.5);
+        // It has gone by well before the end.
+        QVERIFY(rmsOf(pcm, 40, 42) < close * 0.3);
+    }
+
+    void planeIsMuchFainterThanTheTrain()
+    {
+        const QByteArray plane = Sounds::synthesizePlane(44100);
+        const QByteArray train = Sounds::synthesizeTrain(44100);
+        QCOMPARE(plane.size(), Sounds::planeMilliseconds() / 1000 * 44100 * 2);
+        QVERIFY(peakOf(plane, 0, plane.size() / 2) > 3000);
+        QVERIFY(peakOf(plane, 0, plane.size() / 2) < peakOf(train, 0, train.size() / 2) / 2);
+    }
+
+    void planePassesOverheadInTheMiddle()
+    {
+        const QByteArray pcm = Sounds::synthesizePlane(44100);
+        const double middle = rmsOf(pcm, 13, 17), early = rmsOf(pcm, 2, 5), late = rmsOf(pcm, 25, 28);
+        QVERIFY(middle > early * 3);
+        QVERIFY(middle > late * 3);
+    }
+
+    void trainsHappenOneToThreeTimesAndPlanesZeroToTwo()
+    {
+        QRandomGenerator random(8);
+        QSet<int> trains, planes;
+        for (int i = 0; i < 500; ++i) {
+            const int t = Sounds::eventCount(random, "train"), p = Sounds::eventCount(random, "plane");
+            QVERIFY(t >= 1 && t <= 3);
+            QVERIFY(p >= 0 && p <= 2);
+            trains.insert(t);
+            planes.insert(p);
+        }
+        QCOMPARE(trains.size(), 3);
+        QCOMPARE(planes.size(), 3);
+    }
+
+    void eventsAreSpreadWithinTheSession()
+    {
+        QRandomGenerator random(4);
         for (int i = 0; i < 200; ++i) {
-            const int gap = FogHorn::nextGapMilliseconds(random);
-            QVERIFY(gap >= 16000 && gap < 34000);
+            const QList<double> times = Sounds::eventTimes(random, 3, 1500, 44);
+            QCOMPARE(times.size(), 3);
+            for (int j = 0; j < times.size(); ++j) {
+                QVERIFY(times[j] >= 20);
+                QVERIFY(times[j] + 44 <= 1500 - 20);
+                if (j > 0)
+                    QVERIFY(times[j] - times[j - 1] >= 44 + 90);
+            }
         }
     }
 
-    void fogHornMuteIsRemembered()
+    void tooShortASessionGetsNoSounds()
     {
-        FogHorn horn(false);
-        QVERIFY(!horn.muted());
-        horn.setMuted(true);
-        QVERIFY(horn.muted());
+        QRandomGenerator random(1);
+        QVERIFY(Sounds::eventTimes(random, 2, 30, 44).isEmpty());
+        // Room for one but not three: fewer come back rather than crowding.
+        const QList<double> some = Sounds::eventTimes(random, 3, 200, 44);
+        QVERIFY(some.size() >= 1 && some.size() < 3);
+    }
+
+    void soundsMuteIsRemembered()
+    {
+        Sounds sounds(false);
+        QVERIFY(!sounds.muted());
+        sounds.setMuted(true);
+        QVERIFY(sounds.muted());
+    }
+
+    void aPlaneFlyoverShowsEvenWhenMuted()
+    {
+        Sounds sounds(false, "plane");
+        sounds.setMuted(true);
+        QSignalSpy spy(&sounds, &Sounds::planeFlyover);
+        sounds.begin(1500);
+        QVERIFY(spy.wait(6000));
+        QCOMPARE(spy.first().at(1).toInt(), Sounds::planeMilliseconds());
+        const int direction = spy.first().at(0).toInt();
+        QVERIFY(direction == 1 || direction == -1);
+    }
+
+    void noSoundsAtDawnOrDusk()
+    {
+        Sounds sounds(false);
+        sounds.setPeriodSource([] { return QString(); });
+        QSignalSpy spy(&sounds, &Sounds::planeFlyover);
+        sounds.begin(1500);
+        QVERIFY(!spy.wait(500));
     }
 
     void emptyGardenStartsEmpty()
@@ -401,6 +474,25 @@ private slots:
     }
 
 private:
+    static int peakOf(const QByteArray &pcm, int from, int to)
+    {
+        const auto *samples = reinterpret_cast<const qint16 *>(pcm.constData());
+        int peak = 0;
+        for (int i = from; i < to && i < pcm.size() / 2; ++i)
+            peak = qMax(peak, qAbs(int(samples[i])));
+        return peak;
+    }
+
+    static double rmsOf(const QByteArray &pcm, double fromSeconds, double toSeconds)
+    {
+        const auto *samples = reinterpret_cast<const qint16 *>(pcm.constData());
+        const int from = int(fromSeconds * 44100), to = int(toSeconds * 44100);
+        double sum = 0;
+        for (int i = from; i < to; ++i)
+            sum += double(samples[i]) * samples[i];
+        return qSqrt(sum / (to - from));
+    }
+
     static Garden::Plant plant(int seed, const QString &outcome, double progress, int minutes)
     {
         Garden::Plant p;

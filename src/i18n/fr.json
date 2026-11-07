@@ -4,7 +4,6 @@
   "Clear": "Dégagé",
   "Cloudy": "Nuageux",
   "Fog": "Brouillard",
-  "Fog horns muted. M to unmute.": "Cornes de brume coupées. M pour les réactiver.",
   "Fully grown. Space plants another.": "Entièrement poussée. Espace en plante une autre.",
   "Garden": "Jardin",
   "G garden · ? for keys": "G jardin · ? pour les touches",
@@ -12,7 +11,6 @@
   "Growing. Stay with it.": "Elle pousse. Restez concentré.",
   "It wilted. Space tries again.": "Elle a fané. Espace pour réessayer.",
   "Keys": "Touches",
-  "Mute or unmute fog horns": "Couper ou réactiver les cornes de brume",
   "Nothing here yet. Finish a session and the plant stays.": "Rien ici pour l'instant. Terminez une session et la plante reste.",
   "Plant a seed, or give up": "Planter une graine, ou abandonner",
   "Press Space to plant a seed": "Appuyez sur Espace pour planter une graine",
@@ -29,8 +27,6 @@
   "Could not create the garden folder, so this plant was not saved.": "Impossible de créer le dossier du jardin, cette plante n'a donc pas été enregistrée.",
   "Could not open the garden file, so new plants will not be saved.": "Impossible d'ouvrir le fichier du jardin, les nouvelles plantes ne seront donc pas enregistrées.",
   "Could not save the garden: %1": "Impossible d'enregistrer le jardin : %1",
-  "No audio output found, so the fog horns are silent.": "Aucune sortie audio trouvée, les cornes de brume restent donc muettes.",
-  "The audio output cannot play 16-bit sound, so the fog horns are silent.": "La sortie audio ne peut pas lire du son 16 bits, les cornes de brume restent donc muettes.",
   "The garden file could not be read. It was left untouched, and new plants will not be saved.": "Le fichier du jardin n'a pas pu être lu. Il a été laissé intact, et les nouvelles plantes ne seront pas enregistrées.",
   "%n minutes": {
     "one": "%n minute",
@@ -41,5 +37,9 @@
   "Your plant is fully grown": "Votre plante a fini de pousser",
   "Take a breath, then plant another.": "Respirez un instant, puis plantez-en une autre.",
   "No desktop session bus, so Grove cannot send notifications.": "Aucun bus de session du bureau, Grove ne peut donc pas envoyer de notifications.",
-  "No notification service is running, so Grove cannot tell you when a plant is done.": "Aucun service de notifications n'est en cours d'exécution, Grove ne peut donc pas vous prévenir quand une plante est terminée."
+  "No notification service is running, so Grove cannot tell you when a plant is done.": "Aucun service de notifications n'est en cours d'exécution, Grove ne peut donc pas vous prévenir quand une plante est terminée.",
+  "No audio output found, so the distant sounds are silent.": "Aucune sortie audio trouvée, les sons lointains restent donc muets.",
+  "The audio output cannot play 16-bit sound, so the distant sounds are silent.": "La sortie audio ne peut pas lire du son 16 bits, les sons lointains restent donc muets.",
+  "Sounds are off. M turns them on.": "Les sons sont coupés. M les réactive.",
+  "Mute or unmute distant sounds": "Couper ou réactiver les sons lointains"
 }

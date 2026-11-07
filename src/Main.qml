@@ -77,7 +77,7 @@ ApplicationWindow {
         enabled: (win.helpVisible || win.gardenVisible) && !confirm.opened
         onActivated: { win.helpVisible = false; win.gardenVisible = false }
     }
-    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: horn.muted = !horn.muted }
+    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: sounds.muted = !sounds.muted }
     Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; enabled: !confirm.opened; onActivated: win.quit() }
     Shortcut {
         sequence: "Space"
@@ -166,13 +166,13 @@ ApplicationWindow {
             }
         }
 
-        // Only fog horns can go wrong or be muted, so only say so in fog.
+        // Sound is the one thing that can be off or broken without showing, so say so.
         Label {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
             anchors.margins: 12
-            visible: weather.fog > 0.5 && (horn.problem !== "" || horn.muted)
-            text: horn.problem !== "" ? horn.problem : qsTr("Fog horns muted. M to unmute.")
+            visible: sounds.problem !== "" || sounds.muted
+            text: sounds.problem !== "" ? sounds.problem : qsTr("Sounds are off. M turns them on.")
             opacity: 0.6
             font.pixelSize: 12
         }
@@ -230,7 +230,7 @@ ApplicationWindow {
                             { k: "Space", d: qsTr("Plant a seed, or give up") },
                             { k: "?", d: qsTr("Show or hide this help") },
                             { k: "G", d: qsTr("Show or hide the garden") },
-                            { k: "M", d: qsTr("Mute or unmute fog horns") },
+                            { k: "M", d: qsTr("Mute or unmute distant sounds") },
                             { k: "Q", d: qsTr("Quit") }
                         ]
                         delegate: RowLayout {

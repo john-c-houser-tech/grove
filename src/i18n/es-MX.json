@@ -4,7 +4,6 @@
   "Clear": "Despejado",
   "Cloudy": "Nublado",
   "Fog": "Niebla",
-  "Fog horns muted. M to unmute.": "Sirenas de niebla silenciadas. M para activarlas.",
   "Fully grown. Space plants another.": "Totalmente crecida. Espacio planta otra.",
   "Garden": "Jardín",
   "G garden · ? for keys": "G jardín · ? para teclas",
@@ -12,7 +11,6 @@
   "Growing. Stay with it.": "Creciendo. Sigue así.",
   "It wilted. Space tries again.": "Se marchitó. Espacio lo intenta de nuevo.",
   "Keys": "Teclas",
-  "Mute or unmute fog horns": "Silenciar o activar las sirenas de niebla",
   "Nothing here yet. Finish a session and the plant stays.": "Aún no hay nada. Termina una sesión y la planta se queda.",
   "Plant a seed, or give up": "Planta una semilla o abandona",
   "Press Space to plant a seed": "Pulsa Espacio para plantar una semilla",
@@ -29,8 +27,6 @@
   "Could not create the garden folder, so this plant was not saved.": "No se pudo crear la carpeta del jardín, así que esta planta no se guardó.",
   "Could not open the garden file, so new plants will not be saved.": "No se pudo abrir el archivo del jardín, así que las plantas nuevas no se guardarán.",
   "Could not save the garden: %1": "No se pudo guardar el jardín: %1",
-  "No audio output found, so the fog horns are silent.": "No se encontró salida de audio, así que las sirenas de niebla están en silencio.",
-  "The audio output cannot play 16-bit sound, so the fog horns are silent.": "La salida de audio no puede reproducir sonido de 16 bits, así que las sirenas de niebla están en silencio.",
   "The garden file could not be read. It was left untouched, and new plants will not be saved.": "No se pudo leer el archivo del jardín. Se dejó intacto y las plantas nuevas no se guardarán.",
   "%n minutes": {
     "one": "%n minuto",
@@ -41,5 +37,9 @@
   "Your plant is fully grown": "Tu planta ya creció por completo",
   "Take a breath, then plant another.": "Respira hondo y luego planta otra.",
   "No desktop session bus, so Grove cannot send notifications.": "No hay bus de sesión del escritorio, así que Grove no puede enviar notificaciones.",
-  "No notification service is running, so Grove cannot tell you when a plant is done.": "No hay un servicio de notificaciones en ejecución, así que Grove no puede avisarte cuando una planta termine."
+  "No notification service is running, so Grove cannot tell you when a plant is done.": "No hay un servicio de notificaciones en ejecución, así que Grove no puede avisarte cuando una planta termine.",
+  "No audio output found, so the distant sounds are silent.": "No se encontró salida de audio, así que los sonidos lejanos están en silencio.",
+  "The audio output cannot play 16-bit sound, so the distant sounds are silent.": "La salida de audio no puede reproducir sonido de 16 bits, así que los sonidos lejanos están en silencio.",
+  "Sounds are off. M turns them on.": "Los sonidos están desactivados. M los activa.",
+  "Mute or unmute distant sounds": "Silenciar o activar los sonidos lejanos"
 }

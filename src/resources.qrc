@@ -6,6 +6,7 @@
         <file alias="Clouds.qml">Clouds.qml</file>
         <file alias="CloudShape.qml">CloudShape.qml</file>
         <file alias="Hills.qml">Hills.qml</file>
+        <file alias="Plane.qml">Plane.qml</file>
         <file alias="GardenView.qml">GardenView.qml</file>
         <file alias="Precipitation.qml">Precipitation.qml</file>
         <file alias="i18n/en.json">i18n/en.json</file>
