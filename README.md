@@ -86,7 +86,7 @@ window, and does not save over it.
 offscreen. `bin/lint` runs the static checks (formatting, compiler warnings,
 clang-tidy, qmllint, the translation catalogs) and `bin/check-leaks` the
 memory checks (AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer,
-and a soak test); `bin/check` runs everything. `CODING_STANDARDS.md` says how
+Valgrind if it is installed, and a soak test); `bin/check` runs everything. `CODING_STANDARDS.md` says how
 the code is written and checked, and `githooks/` holds a pre-commit hook
 (`git config core.hooksPath githooks`).
 

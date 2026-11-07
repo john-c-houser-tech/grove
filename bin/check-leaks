@@ -1,23 +1,32 @@
 #!/bin/sh
-# The memory gate, in two parts:
+# The memory gate, in three parts:
 #
 # 1. Both test programs built with AddressSanitizer, LeakSanitizer and
 #    UndefinedBehaviorSanitizer and run (the unit tests, and the whole app
 #    driven offscreen by the scene tests). Any leak, memory error or undefined
 #    behaviour fails. No leak is suppressed.
-# 2. The soak test on a normal build: memory that stays referenced but is never
-#    let go escapes the leak checker, so the heap is read after each of forty
+# 2. The same programs, unmodified, under Valgrind, when it is installed: a
+#    second checker that watches the real build rather than an instrumented
+#    one. Any definite or indirect leak or memory error fails. The scene tests
+#    draw with Qt's software renderer here, because under Valgrind the GPU
+#    driver is slow and reports noise of its own; Grove's code runs the same.
+#    tests/valgrind.supp holds the one report of Qt's that is wrong.
+# 3. The soak test on a normal build: memory that stays referenced but is never
+#    let go escapes both checkers, so the heap is read after each of forty
 #    rounds of each part of a day, and must not keep rising.
 #
 #   bin/check-leaks           the check
 #   bin/check-leaks --canary  proves the check works: plants a leak in a unit
 #                             test, and keeps memory in the soak test, and
-#                             passes only if both are caught
+#                             passes only if every part catches them
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 canary=0
 [ "${1:-}" = "--canary" ] && canary=1
+# In a canary run only the unit test with the planted leak runs.
+suites="grove_tests scene_tests"
+[ "$canary" = 1 ] && suites=grove_tests
 
 export QT_QPA_PLATFORM=offscreen
 export QT_QUICK_BACKEND=rhi
@@ -29,39 +38,83 @@ unset QT_QPA_PLATFORMTHEME QT_IM_MODULE QT_STYLE_OVERRIDE
 export ASAN_OPTIONS=detect_leaks=1:detect_stack_use_after_return=1:strict_string_checks=1
 export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
 
+# Runs a test program, the planted leak alone in a canary run.
+run() {
+    if [ "$canary" = 1 ]; then
+        GROVE_LEAK_CANARY=1 "$@" leakCanary
+    else
+        "$@"
+    fi
+}
+
+# Reports whether a canary run caught the leak, by the log it left.
+caught() {
+    if grep -q "leakCanary" "$2"; then
+        echo "canary: $1 caught the planted leak, in leakCanary"
+    else
+        echo "canary: $1 did NOT catch the planted leak"
+        exit 1
+    fi
+}
+
+# 1. The sanitizers.
 failed=0
-for suite in grove_tests scene_tests; do
-    [ "$canary" = 1 ] && [ "$suite" != grove_tests ] && continue
+for suite in $suites; do
     build="$ROOT/build/asan-$suite"
     mkdir -p "$build"
     cd "$build"
     qmake6 "$ROOT/tests/$suite.pro" "CONFIG+=debug sanitizer sanitize_address sanitize_undefined" "CONFIG-=release" >/dev/null
     make -j"$(nproc)" >/dev/null
     log="$build/check.log"
-    if [ "$canary" = 1 ]; then
-        GROVE_LEAK_CANARY=1 ./"$suite" leakCanary >"$log" 2>&1 || true
-    else
-        ./"$suite" >"$log" 2>&1 || failed=1
-    fi
+    run ./"$suite" >"$log" 2>&1 || failed=1
     # The sanitizers' exit status does not survive QTest's, so the report decides.
     if grep -qE "ERROR: (AddressSanitizer|LeakSanitizer)|runtime error:" "$log"; then
         failed=1
+        [ "$canary" = 1 ] && caught "the sanitizers" "$log" && continue
         grep -E -A14 "ERROR: (AddressSanitizer|LeakSanitizer)|runtime error:" "$log" | head -40
         grep -E "^SUMMARY:" "$log" || true
+    elif [ "$canary" = 1 ]; then
+        caught "the sanitizers" /dev/null
     fi
-    echo "$suite: $(grep -E '^Totals:' "$log" || echo 'did not finish')"
+    echo "sanitizers, $suite: $(grep -E '^Totals:' "$log" || echo 'did not finish')"
 done
+[ "$canary" = 0 ] && [ "$failed" = 0 ] && echo "sanitizers: no leaks, memory errors or undefined behaviour"
 
-if [ "$canary" = 1 ]; then
-    if [ "$failed" = 1 ] && grep -q "leakCanary" "$ROOT/build/asan-grove_tests/check.log"; then
-        echo "canary: the planted leak was caught, in leakCanary"
-    else
-        echo "canary: the planted leak was NOT caught"
-        exit 1
-    fi
+# 2. Valgrind.
+if command -v valgrind >/dev/null; then
+    vfailed=0
+    for suite in $suites; do
+        build="$ROOT/build/valgrind-$suite"
+        mkdir -p "$build"
+        cd "$build"
+        qmake6 "$ROOT/tests/$suite.pro" "CONFIG+=force_debug_info" >/dev/null
+        make -j"$(nproc)" >/dev/null
+        log="$build/valgrind.log"
+        # Through env: an assignment before a shell function can outlive the call.
+        run env QT_QUICK_BACKEND=software valgrind --suppressions="$ROOT/tests/valgrind.supp" \
+            --leak-check=full --show-leak-kinds=definite,indirect --errors-for-leak-kinds=definite,indirect \
+            --num-callers=30 --error-exitcode=1 --log-file="$log" ./"$suite" >"$build/tests.log" 2>&1 || vfailed=1
+        if ! grep -q "ERROR SUMMARY: 0 errors" "$log"; then
+            vfailed=1
+            [ "$canary" = 1 ] && caught "Valgrind" "$log" && continue
+            grep -E -B2 -A20 "are definitely lost|are indirectly lost|Invalid|uninitialised|Mismatched" "$log" | head -60
+            grep -E "ERROR SUMMARY" "$log"
+        elif [ "$canary" = 1 ]; then
+            caught "Valgrind" /dev/null
+        fi
+        echo "valgrind, $suite: $(grep -E '^Totals:' "$build/tests.log" || echo 'did not finish')"
+    done
+    [ "$vfailed" = 1 ] && failed=1
+    [ "$canary" = 0 ] && [ "$vfailed" = 0 ] && echo "valgrind: no leaks or memory errors"
+elif [ "$canary" = 1 ]; then
+    # A canary run proves every part, so a part that cannot run fails it.
+    echo "canary: Valgrind is not installed, so its part cannot be proved (sudo pacman -S valgrind)"
+    exit 1
+else
+    echo "valgrind: not installed, so skipped (sudo pacman -S valgrind)"
 fi
-[ "$canary" = 0 ] && [ "$failed" = 0 ] && echo "no leaks, memory errors or undefined behaviour"
 
+# 3. The soak test.
 build="$ROOT/build/scene_tests"
 mkdir -p "$build"
 cd "$build"
@@ -69,10 +122,10 @@ qmake6 "$ROOT/tests/scene_tests.pro" >/dev/null
 make -j"$(nproc)" >/dev/null
 if [ "$canary" = 1 ]; then
     if GROVE_SOAK=1 GROVE_LEAK_CANARY=1 ./scene_tests repeatingTheDayDoesNotGrowTheHeap:garden >"$build/soak.log" 2>&1; then
-        echo "canary: memory kept in the soak test was NOT caught"
+        echo "canary: the soak test did NOT catch memory kept each round"
         exit 1
     fi
-    echo "canary: memory kept in the soak test was caught ($(grep -m1 -oE '[0-9]+ bytes a round' "$build/soak.log"))"
+    echo "canary: the soak test caught memory kept each round ($(grep -m1 -oE '[0-9]+ bytes a round' "$build/soak.log"))"
     exit 0
 fi
 if GROVE_SOAK=1 ./scene_tests repeatingTheDayDoesNotGrowTheHeap >"$build/soak.log" 2>&1; then
