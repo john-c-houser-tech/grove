@@ -21,8 +21,12 @@ Item {
     property color ballastColor: "#26382d"
     property color railColor: "#6d7f78"
     property color roadColor: "#7a7258"
-    // The bare earth of the cut the road climbs into beyond the crossing.
+    // Beyond the crossing: the bare earth of the cut slope above the road,
+    // the tipped earth of the fill slope below it, and the hillside itself.
     property color cutColor: "#4a4232"
+    property color fillColor: "#3d3a2c"
+    property color hillColor: "#44605a"
+    property color hazeColor: "#9fb7c4"
 
     // The crossing stands a little right of the middle, clear of the plant.
     readonly property real crossingX: 0.68
@@ -108,6 +112,9 @@ Item {
             function onRailColorChanged() { bed.requestPaint() }
             function onRoadColorChanged() { bed.requestPaint() }
             function onCutColorChanged() { bed.requestPaint() }
+            function onFillColorChanged() { bed.requestPaint() }
+            function onHillColorChanged() { bed.requestPaint() }
+            function onHazeColorChanged() { bed.requestPaint() }
         }
         onPaint: {
             var ctx = getContext("2d")
@@ -167,34 +174,105 @@ Item {
                     ctx.lineTo(lower[b].x, lower[b].y)
                 ctx.closePath()
                 ctx.fill()
-                return upper
+                return { upper: upper, lower: lower }
             }
 
             ctx.fillStyle = root.roadColor
             // Near side.
             road({ x: centre, y: cy }, { x: centre, y: cy + H * 0.03 },
                  { x: centre + W * 0.1, y: cy + H * 0.034 }, { x: W * 1.08, y: cy + H * 0.028 }, 0)
-            // Far side: straight away from the rails at first, then turning up
-            // the slope to the left, getting narrower as it goes.
-            var far0 = { x: centre, y: cy }, far1 = { x: centre - W * 0.004, y: cy - H * 0.012 }
-            var far2 = { x: centre - W * 0.07, y: cy - H * 0.014 }, far3 = { x: centre - W * 0.14, y: cy - H * 0.03 }
-            var bank = road(far0, far1, far2, far3, 0.65)
-            // The cut: a bank of bare earth on the uphill side of the road over
-            // its last stretch, which the road runs in under and out of sight.
-            ctx.fillStyle = root.cutColor
+            // Far side: the road is cut into the hillside as it climbs, like an
+            // inslope road. It leaves the rails at full width, bends left and
+            // climbs across the face of the shoulder of hill, with a cut slope of
+            // bare earth above it and a fill slope below, then curves around
+            // the shoulder and out of sight.
+            var far0 = { x: centre, y: cy }, far1 = { x: centre - W * 0.006, y: cy - H * 0.02 }
+            var far2 = { x: centre - W * 0.06, y: cy - H * 0.03 }, far3 = { x: centre - W * 0.13, y: cy - H * 0.056 }
+            // Measure the road's edges first, without drawing.
+            var edges = (function () {
+                var saved = ctx.fillStyle
+                ctx.fillStyle = "transparent"
+                var e = road(far0, far1, far2, far3, 0.7)
+                ctx.fillStyle = saved
+                return e
+            })()
+            var n = edges.upper.length
+            function along(i) { return i / (n - 1) }
+            // The fill slope: earth tipped down the hill below the road, deepest
+            // where the road is farthest out on the slope.
+            var fillFrom = Math.floor(n * 0.2)
+            ctx.fillStyle = root.fillColor
             ctx.beginPath()
-            var startCut = Math.floor(bank.length * 0.55)
-            ctx.moveTo(bank[startCut].x, bank[startCut].y)
-            for (var e = startCut + 1; e < bank.length; e++) {
-                var rise = H * 0.009 * (e - startCut) / (bank.length - startCut)
-                ctx.lineTo(bank[e].x, bank[e].y - rise)
+            ctx.moveTo(edges.lower[fillFrom].x, edges.lower[fillFrom].y)
+            for (var i = fillFrom + 1; i < n; i++)
+                ctx.lineTo(edges.lower[i].x, edges.lower[i].y)
+            for (var k = n - 1; k >= fillFrom; k--) {
+                var tf = (along(k) - along(fillFrom)) / (1 - along(fillFrom))
+                var drop = H * 0.012 * Math.sin(Math.PI * Math.min(1, tf * 1.1)) * (1 - 0.5 * along(k))
+                ctx.lineTo(edges.lower[k].x + W * 0.004 * tf, edges.lower[k].y + drop)
             }
-            var endPoint = curve(far0, far1, far2, far3, 1)
-            ctx.lineTo(endPoint.x - W * 0.012, endPoint.y + H * 0.002)
-            for (var f = bank.length - 1; f >= startCut; f--)
-                ctx.lineTo(bank[f].x, bank[f].y + H * 0.0005)
             ctx.closePath()
             ctx.fill()
+            // The road itself.
+            ctx.fillStyle = root.roadColor
+            road(far0, far1, far2, far3, 0.7)
+            // The cut slope: the bank left where the road was dug into the hill,
+            // tallest partway up and gone where the road leaves the flat.
+            var cutFrom = Math.floor(n * 0.25)
+            var cutTop = []
+            for (var c = cutFrom; c < n; c++) {
+                var tc = (along(c) - along(cutFrom)) / (1 - along(cutFrom))
+                var tall = H * (0.004 + 0.02 * Math.sin(Math.PI * 0.5 * Math.min(1, tc * 1.6))) * (1 - 0.35 * tc)
+                cutTop.push({ x: edges.upper[c].x - W * 0.003 * tc, y: edges.upper[c].y - tall })
+            }
+            ctx.fillStyle = root.cutColor
+            ctx.beginPath()
+            ctx.moveTo(edges.upper[cutFrom].x, edges.upper[cutFrom].y)
+            for (var u2 = cutFrom + 1; u2 < n; u2++)
+                ctx.lineTo(edges.upper[u2].x, edges.upper[u2].y)
+            for (var v2 = cutTop.length - 1; v2 >= 0; v2--)
+                ctx.lineTo(cutTop[v2].x, cutTop[v2].y)
+            ctx.closePath()
+            ctx.fill()
+            // Rain has scored the cut with short runnels down its face.
+            ctx.strokeStyle = Qt.rgba(root.cutColor.r * 0.82, root.cutColor.g * 0.82, root.cutColor.b * 0.82, 0.45)
+            ctx.lineWidth = 1
+            for (var r2 = 3; r2 < cutTop.length - 2; r2 += 5) {
+                var topPt = cutTop[r2], footPt = edges.upper[cutFrom + r2]
+                ctx.beginPath()
+                ctx.moveTo(topPt.x, topPt.y + (footPt.y - topPt.y) * 0.15)
+                ctx.lineTo(topPt.x + (footPt.x - topPt.x) * 0.7 + 1, topPt.y + (footPt.y - topPt.y) * 0.75)
+                ctx.stroke()
+            }
+            // Where the road curves around the shoulder, the near flank of the
+            // hill comes across it, and it passes out of sight.
+            var bend = curve(far0, far1, far2, far3, 0.86)
+            var span = H * 0.034
+            // Coloured exactly as the hillside around it is: fading toward the
+            // sky colour at its foot, as the ridges behind are painted.
+            var y0 = H * root.horizon
+            var flank = ctx.createLinearGradient(0, y0 - H * 0.2, 0, y0 + 2)
+            flank.addColorStop(0, root.hillColor)
+            flank.addColorStop(1, Qt.rgba(root.hillColor.r + (root.hazeColor.r - root.hillColor.r) * 0.4,
+                                          root.hillColor.g + (root.hazeColor.g - root.hillColor.g) * 0.4,
+                                          root.hillColor.b + (root.hazeColor.b - root.hillColor.b) * 0.4, 1))
+            ctx.fillStyle = flank
+            ctx.beginPath()
+            ctx.moveTo(bend.x + W * 0.012, bend.y - span)
+            ctx.bezierCurveTo(bend.x - W * 0.004, bend.y - span * 0.4, bend.x - W * 0.002, bend.y + span * 0.2,
+                              bend.x + W * 0.006, bend.y + span * 0.55)
+            ctx.lineTo(bend.x - W * 0.08, bend.y + span * 0.55)
+            ctx.lineTo(bend.x - W * 0.08, bend.y - span)
+            ctx.closePath()
+            ctx.fill()
+            // A soft shadow along the fold of the shoulder.
+            ctx.strokeStyle = Qt.darker(root.hillColor, 1.12)
+            ctx.lineWidth = Math.max(1, H * 0.002)
+            ctx.beginPath()
+            ctx.moveTo(bend.x + W * 0.012, bend.y - span)
+            ctx.bezierCurveTo(bend.x - W * 0.004, bend.y - span * 0.4, bend.x - W * 0.002, bend.y + span * 0.2,
+                              bend.x + W * 0.006, bend.y + span * 0.55)
+            ctx.stroke()
             // Ballast, then a rail catching what light there is on top of it.
             line()
             ctx.lineWidth = Math.max(2, H * 0.004)

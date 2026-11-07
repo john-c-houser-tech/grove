@@ -164,7 +164,10 @@ Item {
         floorColor: look.floorColor
         ballastColor: Qt.darker(look.floorColor, 1.35)
         roadColor: Qt.tint(look.floorColor, Qt.rgba(0.62, 0.55, 0.42, 0.45))
-        cutColor: Qt.darker(Qt.tint(look.midColor, Qt.rgba(0.45, 0.36, 0.25, 0.55)), 1.15)
+        cutColor: Qt.tint(look.midColor, Qt.rgba(0.62, 0.5, 0.34, 0.6))
+        fillColor: Qt.darker(Qt.tint(look.midColor, Qt.rgba(0.5, 0.42, 0.3, 0.5)), 1.1)
+        hillColor: look.midColor
+        hazeColor: light.skyBottom
         railColor: Qt.tint(look.floorColor, Qt.rgba(light.skyBottom.r, light.skyBottom.g, light.skyBottom.b, 0.55))
     }
     Connections {
