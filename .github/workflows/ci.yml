@@ -1,7 +1,8 @@
 # CI: bin/lint (formatting, warnings as errors, clang-tidy, qmllint, the
 # translation catalogs) and bin/test (the unit tests and the offscreen scene
-# tests), in an Arch Linux container so Qt and clang are the versions Grove is
-# built with. bin/check-leaks takes longer and is run by hand, as
+# tests), in an Arch Linux container that installs from Omarchy's stable
+# mirror, the one the desktop uses, so Qt and clang are the versions Grove is
+# built with there. bin/check-leaks takes longer and is run by hand, as
 # CODING_STANDARDS.md says. No secrets, no network beyond the packages.
 # The ruleset on main requires the one "CI result" check; keep that job's name.
 name: CI
@@ -26,13 +27,22 @@ jobs:
     timeout-minutes: 30
     container: archlinux:latest
     steps:
+      # Omarchy's stable mirror lags upstream Arch; without it CI would get a
+      # new clang or Qt before the desktop and could fail lint on code that
+      # passes there. -Syuu also steps back anything in the image that is newer
+      # than the mirror. The keyring goes first, so a key newer than the image
+      # is known.
       - name: Packages
         run: |
-          pacman -Syu --noconfirm --needed git base-devel clang python mesa ttf-dejavu \
-            qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg qt6-wayland \
+          echo 'Server = https://stable-mirror.omarchy.org/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Suu --noconfirm --needed git base-devel clang python mesa ttf-dejavu \
+            qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg \
             xorg-server-xvfb xorg-xauth
-          echo "$(pacman -Q qt6-base) / $(pacman -Q clang)"
+          pacman -Q qt6-base qt6-declarative clang mesa
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # nothing after this needs git access
       # The container runs as root; the checks run as a normal user, as they
       # do on a developer's machine.
       - name: A user to run as
