@@ -24,6 +24,9 @@ Quick, built with qmake. See `README.md` for what it does and
 - `bin/test` runs both test programs, offscreen.
 - `bin/lint` runs every static check; `bin/check-leaks` the memory checks;
   `bin/check` everything. All must pass before work is called done.
+- `git config core.hooksPath githooks` enables the pre-commit hook (lint and
+  tests), once per clone. Until then nothing runs at commit time, so run
+  `bin/lint` and `bin/test` yourself.
 
 ## Rules for agents
 
@@ -46,6 +49,13 @@ integration branch.
 2. Branch from dev: `git checkout -b <feature>`. Check `git branch --show-current`
    before every commit.
 3. Commit there, push the branch, and open a PR into dev: `gh pr create --base dev`.
-4. Request a Copilot review (`gh pr edit <n> --add-reviewer @copilot`) and
-   address its comments with follow-up commits.
-5. John merges to main. Wait for him.
+4. Wait for `gh pr checks <n>` to pass. CI (`.github/workflows/ci.yml`) runs
+   `bin/lint` and `bin/test` in an Arch Linux container, so the Qt and clang
+   versions match the ones Grove is built with here. dev's ruleset doesn't
+   require CI, but main's requires the `CI result` check, so a red PR merged
+   into dev blocks the next merge to main. Keep that job's name.
+5. Before review requests, run independent agent reviews of the PR and fix
+   what they find. Then request a Copilot review (`gh pr edit <n> --add-reviewer @copilot`)
+   when Copilot credits are available, and address its comments with
+   follow-up commits.
+6. John merges to main. Wait for him.
