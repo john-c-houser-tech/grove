@@ -1,0 +1,78 @@
+# CI: bin/lint (formatting, warnings as errors, clang-tidy, qmllint, the
+# translation catalogs) and bin/test (the unit tests and the offscreen scene
+# tests), in an Arch Linux container that installs from Omarchy's stable
+# mirror, the one the desktop uses, so Qt and clang are the versions Grove is
+# built with there. bin/check-leaks takes longer and is run by hand, as
+# CODING_STANDARDS.md says. No secrets, no network beyond the packages.
+# The ruleset on main requires the one "CI result" check; keep that job's name.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: archlinux:latest
+    steps:
+      # Omarchy's stable mirror lags upstream Arch; without it CI would get a
+      # new clang or Qt before the desktop and could fail lint on code that
+      # passes there. -Syuu also steps back anything in the image that is newer
+      # than the mirror. The keyring goes first, so a key newer than the image
+      # is known.
+      - name: Packages
+        run: |
+          echo 'Server = https://stable-mirror.omarchy.org/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Suu --noconfirm --needed git base-devel clang python mesa ttf-dejavu \
+            qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg \
+            xorg-server-xvfb xorg-xauth
+          pacman -Q qt6-base qt6-declarative clang mesa
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # nothing after this needs git access
+      # The container runs as root; the checks run as a normal user, as they
+      # do on a developer's machine.
+      - name: A user to run as
+        run: |
+          useradd -m ci
+          chown -R ci "$GITHUB_WORKSPACE"
+      - name: Lint
+        run: su ci -c "cd '$GITHUB_WORKSPACE' && bin/lint"
+      # bin/test runs offscreen, as on a desktop; offscreen Qt takes its OpenGL
+      # from an X display when there is one, so a virtual one (Mesa's software
+      # renderer) lets the scene tests draw. Without it they abort.
+      - name: Tests
+        run: su ci -c "cd '$GITHUB_WORKSPACE' && xvfb-run -a bin/test"
+
+  # The one check main's ruleset requires.
+  result:
+    name: CI result
+    if: always()
+    needs: [check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) exit 1 ;;
+            esac
+          done
