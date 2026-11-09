@@ -17,6 +17,8 @@ Quick, built with qmake. See `README.md` for what it does and
 - `tests/grove_tests.cpp` has the unit tests; `tests/scene_tests.cpp` drives
   the whole app offscreen.
 - `pkgbuild/` packages it for Arch; `bin/install` builds and installs it.
+- `githooks/pre-commit` runs `bin/lint` and `bin/test` before each commit;
+  `.github/workflows/ci.yml` runs them on every PR.
 
 ## Commands
 
@@ -24,6 +26,10 @@ Quick, built with qmake. See `README.md` for what it does and
 - `bin/test` runs both test programs, offscreen.
 - `bin/lint` runs every static check; `bin/check-leaks` the memory checks;
   `bin/check` everything. All must pass before work is called done.
+- `git config core.hooksPath githooks` enables the pre-commit hook (lint and
+  tests), once per clone. Until then nothing runs at commit time, so run
+  `bin/lint` and `bin/test` yourself. The hook checks the working tree, so
+  unstaged edits count.
 
 ## Rules for agents
 
@@ -46,6 +52,17 @@ integration branch.
 2. Branch from dev: `git checkout -b <feature>`. Check `git branch --show-current`
    before every commit.
 3. Commit there, push the branch, and open a PR into dev: `gh pr create --base dev`.
-4. Request a Copilot review (`gh pr edit <n> --add-reviewer @copilot`) and
-   address its comments with follow-up commits.
-5. John merges to main. Wait for him.
+4. Wait for CI to pass: `gh pr checks <n> --watch`. CI
+   (`.github/workflows/ci.yml`) runs `bin/lint` and `bin/test` in an Arch
+   Linux container that installs from Omarchy's stable mirror, the one the
+   desktop uses, so Qt and clang match a desktop that is up to date. If CI
+   fails lint where the desktop passes, compare the versions its Packages step
+   prints with `pacman -Q`. CI does not run `bin/check-leaks`: run it (or
+   `bin/check`) yourself whenever `CODING_STANDARDS.md` asks for it. dev's
+   ruleset doesn't require CI, but main's requires the `CI result` check, so a
+   red PR merged into dev blocks the next merge to main. Keep that job's name.
+5. Before review requests, run independent agent reviews of the PR and fix
+   what they find. Then request a Copilot review (`gh pr edit <n> --add-reviewer @copilot`)
+   when Copilot credits are available, and address its comments with
+   follow-up commits.
+6. John merges to main. Wait for him.
