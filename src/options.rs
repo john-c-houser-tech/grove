@@ -3,6 +3,8 @@
 
 use std::sync::OnceLock;
 
+use std::path::PathBuf;
+
 use chrono::{NaiveDate, NaiveTime};
 
 use crate::weather::Kind;
@@ -17,6 +19,9 @@ pub struct Options {
     pub date: Option<NaiveDate>,
     /// A pinned weather.
     pub weather: Option<Kind>,
+    /// Where the garden is kept; `None` for the user's data directory. A
+    /// shortened session is only saved when a garden is given.
+    pub garden_path: Option<PathBuf>,
 }
 
 impl Default for Options {
@@ -26,13 +31,14 @@ impl Default for Options {
             time: None,
             date: None,
             weather: None,
+            garden_path: None,
         }
     }
 }
 
 impl Options {
     /// Options from the environment: GROVE_SECONDS, GROVE_TIME (HH:MM),
-    /// GROVE_DATE (YYYY-MM-DD) and GROVE_WEATHER. Nothing else reads the
+    /// GROVE_DATE (YYYY-MM-DD), GROVE_WEATHER and GROVE_GARDEN. Nothing else reads the
     /// environment.
     pub fn from_environment() -> Self {
         Self::from_variables(|name| std::env::var(name).ok())
@@ -52,6 +58,7 @@ impl Options {
         options.time = variable("GROVE_TIME").and_then(|v| NaiveTime::parse_from_str(&v, "%H:%M").ok());
         options.date = variable("GROVE_DATE").and_then(|v| NaiveDate::parse_from_str(&v, "%Y-%m-%d").ok());
         options.weather = variable("GROVE_WEATHER").and_then(|v| Kind::named(&v));
+        options.garden_path = variable("GROVE_GARDEN").filter(|v| !v.is_empty()).map(PathBuf::from);
         options
     }
 }
@@ -96,7 +103,9 @@ mod tests {
             ("GROVE_TIME", "17:05"),
             ("GROVE_DATE", "2026-10-20"),
             ("GROVE_WEATHER", "fog"),
+            ("GROVE_GARDEN", "/tmp/garden.json"),
         ]);
+        assert_eq!(options.garden_path, Some(PathBuf::from("/tmp/garden.json")));
         assert_eq!(options.seconds, 30);
         assert_eq!(options.time, NaiveTime::from_hms_opt(17, 5, 0));
         assert_eq!(options.date, NaiveDate::from_ymd_opt(2026, 10, 20));
@@ -110,6 +119,7 @@ mod tests {
             ("GROVE_TIME", "teatime"),
             ("GROVE_DATE", "20/10/2026"),
             ("GROVE_WEATHER", "hail"),
+            ("GROVE_GARDEN", ""),
         ]);
         assert_eq!(options, Options::default());
     }

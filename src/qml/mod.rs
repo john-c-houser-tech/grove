@@ -3,6 +3,7 @@
 
 pub mod backend;
 mod color;
+pub mod garden;
 pub mod light;
 mod shared;
 pub mod weather;

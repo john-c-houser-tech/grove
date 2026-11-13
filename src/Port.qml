@@ -8,14 +8,16 @@ QtObject {
     id: port
 
     property int growthSteps: 0
+    property Timer leave: Timer { interval: 100; onTriggered: Qt.quit() }
 
     property Connections session: Connections {
         target: Backend
         function onStateChanged() {
             console.log("state", Backend.state, "progress", Backend.progress, "growth", Math.round(Weather.growth * 1000) / 1000,
                         "growth steps", port.growthSteps)
+            // A moment for the garden to show the new plant before leaving.
             if (Backend.state === "done")
-                Qt.quit()
+                port.leave.start()
         }
     }
     property Connections growth: Connections {
@@ -24,7 +26,27 @@ QtObject {
         function onChanged() { console.log("weather", Weather.kind, Weather.season, "rain", Weather.rain) }
     }
 
+    // The garden as a view sees it: its rows, through a delegate.
+    property Instantiator rows: Instantiator {
+        model: Garden
+        delegate: QtObject {
+            required property int seed
+            required property string outcome
+            required property string weather
+            required property real progress
+            required property date when
+            required property int minutes
+            Component.onCompleted: console.log("plant", outcome, weather, progress, minutes, "min", when.getFullYear() > 2000)
+        }
+    }
+    property Connections garden: Connections {
+        target: Garden
+        function onCountsChanged() { console.log("garden", Garden.grown, "grown", Garden.wilted, "wilted", Garden.focusedMinutes, "min") }
+        function onProblemChanged() { console.log("garden problem:", Garden.problem) }
+    }
+
     Component.onCompleted: {
+        console.log("garden", Garden.grown, "grown", Garden.wilted, "wilted", "problem:", Garden.problem)
         console.log("state", Backend.state, "seconds", Backend.seconds, "remaining", Backend.remaining)
         console.log("light", Light.skyTop, Light.sunUp, "ambient", Math.round(Light.ambient * 100) / 100, "night", Light.nightTint)
         console.log("weather", Weather.kind, Weather.season)

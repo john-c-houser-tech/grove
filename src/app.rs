@@ -5,6 +5,7 @@
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, Timelike};
 
 use crate::color::Color;
+use crate::garden::{self, Garden, Outcome, Plant};
 use crate::light::{Moment, Sky, DEFAULT_ACCENT};
 use crate::options::Options;
 use crate::session::{Session, State, SEED_LIMIT};
@@ -23,6 +24,10 @@ pub enum Event {
     Growth,
     /// The light moved on, or the accent changed.
     Light,
+    /// The garden's plants changed, in the way given.
+    Garden(garden::Change),
+    /// The garden's problem changed.
+    GardenProblem,
 }
 
 /// The app's state and the rules that tie its parts together.
@@ -34,10 +39,22 @@ pub struct App {
     weather: Weather,
     accent: Color,
     sky: Sky,
+    garden: Garden,
 }
 
 impl App {
+    /// The app, with its garden where the options say, or in the user's
+    /// data directory.
     pub fn new(options: Options) -> Self {
+        let path = options
+            .garden_path
+            .clone()
+            .unwrap_or_else(|| Garden::default_path(|name| std::env::var(name).ok()));
+        Self::with_garden(options, Garden::open(path))
+    }
+
+    /// The app, keeping its plants in `garden`.
+    pub fn with_garden(options: Options, garden: Garden) -> Self {
         let now = Local::now().naive_local();
         let fixed = (options.time.is_some() || options.date.is_some()).then(|| {
             options
@@ -52,6 +69,7 @@ impl App {
             sky: Sky::at(moment(fixed.unwrap_or(now)), accent),
             accent,
             fixed,
+            garden,
             options,
         };
         // The idle window has weather too, until the first session rolls its own.
@@ -69,6 +87,10 @@ impl App {
 
     pub fn sky(&self) -> &Sky {
         &self.sky
+    }
+
+    pub fn garden(&self) -> &Garden {
+        &self.garden
     }
 
     /// Starts a session growing the plant of `seed`, unless one is growing.
@@ -131,7 +153,43 @@ impl App {
         if weather.growth {
             events.push(Event::Growth);
         }
+        if changes.state {
+            self.keep_plant(&mut events);
+        }
         events
+    }
+
+    /// Puts the plant of a session that just ended into the garden.
+    fn keep_plant(&mut self, events: &mut Vec<Event>) {
+        let outcome = match self.session.state() {
+            State::Done => Outcome::Done,
+            State::Wilted => Outcome::Wilted,
+            State::Idle | State::Growing => return,
+        };
+        // A shortened test session (GROVE_SECONDS) is not saved unless a
+        // garden is given, so trying the app out never adds make-believe
+        // plants to the real garden.
+        if self.session.seconds() != 25 * 60 && self.options.garden_path.is_none() {
+            return;
+        }
+        let problem = self.garden.problem().cloned();
+        let change = self.garden.record(Plant {
+            seed: self.session.seed(),
+            outcome,
+            season: self.weather.season().name().to_string(),
+            weather: self.weather.kind().name().to_string(),
+            progress: self.weather.growth(),
+            when: Local::now().naive_local(),
+            minutes: if outcome == Outcome::Done {
+                self.session.minutes()
+            } else {
+                0
+            },
+        });
+        events.push(Event::Garden(change));
+        if self.garden.problem() != problem.as_ref() {
+            events.push(Event::GardenProblem);
+        }
     }
 
     /// Read afresh for each session, since Grove may stay open for days.
@@ -162,12 +220,31 @@ mod tests {
             time: NaiveTime::from_hms_opt(12, 30, 0),
             date: NaiveDate::from_ymd_opt(2026, 6, 21),
             weather: Some(Kind::Rain),
+            garden_path: None,
+        }
+    }
+
+    /// An app whose options name no garden, so short sessions are not kept.
+    /// Its garden is a file that is never there, never the user's.
+    fn app(seconds: i32) -> App {
+        App::with_garden(options(seconds), nowhere())
+    }
+
+    fn nowhere() -> Garden {
+        Garden::open("/nonexistent/grove-tests/garden.json")
+    }
+
+    /// Options keeping a garden in `dir`.
+    fn keeping(seconds: i32, dir: &tempfile::TempDir) -> Options {
+        Options {
+            garden_path: Some(dir.path().join("garden.json")),
+            ..options(seconds)
         }
     }
 
     #[test]
     fn a_fixed_time_freezes_the_light() {
-        let mut app = App::new(options(10));
+        let mut app = app(10);
         assert!(app.sky().sun_up);
         let before = *app.sky();
         assert_eq!(app.refresh_light(), vec![Event::Light]);
@@ -180,16 +257,19 @@ mod tests {
 
     #[test]
     fn a_date_alone_fixes_the_season() {
-        let app = App::new(Options {
-            time: None,
-            ..options(10)
-        });
+        let app = App::with_garden(
+            Options {
+                time: None,
+                ..options(10)
+            },
+            nowhere(),
+        );
         assert_eq!(app.weather().season(), Season::Summer);
     }
 
     #[test]
     fn a_new_session_rolls_its_weather() {
-        let mut app = App::new(options(10));
+        let mut app = app(10);
         let events = app.start(7);
         assert_eq!(
             events,
@@ -201,7 +281,7 @@ mod tests {
 
     #[test]
     fn the_plant_grows_with_the_session() {
-        let mut app = App::new(options(10));
+        let mut app = app(10);
         app.start(7);
         let events = app.advance(5000);
         assert_eq!(events, vec![Event::Progress, Event::Growth]);
@@ -213,8 +293,59 @@ mod tests {
     }
 
     #[test]
+    fn a_finished_plant_goes_into_the_garden() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut app = App::new(keeping(120, &dir));
+        app.start(7);
+        let events = app.advance(120_000);
+        assert!(events.contains(&Event::Garden(garden::Change::Reset)));
+        assert!(!events.contains(&Event::GardenProblem));
+        let plant = &app.garden().plants()[0];
+        assert_eq!((plant.seed, plant.outcome, plant.minutes), (7, Outcome::Done, 2));
+        assert_eq!(
+            (plant.season.as_str(), plant.weather.as_str(), plant.progress),
+            ("summer", "rain", 1.0)
+        );
+        assert_eq!(App::new(keeping(120, &dir)).garden().plants().len(), 1);
+    }
+
+    #[test]
+    fn a_wilted_plant_is_kept_as_far_as_it_grew() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut app = App::new(keeping(120, &dir));
+        app.start(7);
+        app.advance(30_000);
+        app.give_up();
+        let plant = &app.garden().plants()[0];
+        assert_eq!((plant.outcome, plant.minutes), (Outcome::Wilted, 0));
+        assert!(plant.progress > 0.25 && plant.progress < 0.4);
+    }
+
+    #[test]
+    fn a_shortened_session_is_not_kept_without_a_garden_of_its_own() {
+        // The path is never touched: the session is too short to be saved.
+        let mut app = app(10);
+        app.start(7);
+        let events = app.advance(10_000);
+        assert!(!events.iter().any(|event| matches!(event, Event::Garden(_))));
+    }
+
+    #[test]
+    fn a_spoiled_garden_is_reported_once() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut app = App::new(keeping(120, &dir));
+        std::fs::write(dir.path().join("garden.json"), "this is not json").unwrap();
+        app.start(7);
+        let events = app.advance(120_000);
+        assert!(events.contains(&Event::Garden(garden::Change::Inserted)));
+        assert!(events.contains(&Event::GardenProblem));
+        app.start(8);
+        assert!(!app.advance(120_000).contains(&Event::GardenProblem));
+    }
+
+    #[test]
     fn giving_up_stops_the_growth() {
-        let mut app = App::new(options(10));
+        let mut app = app(10);
         app.start(7);
         app.advance(4000);
         assert_eq!(app.give_up(), vec![Event::State]);

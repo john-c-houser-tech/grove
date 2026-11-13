@@ -3,6 +3,7 @@
 mod app;
 mod color;
 mod easing;
+mod garden;
 mod light;
 mod options;
 mod qml;

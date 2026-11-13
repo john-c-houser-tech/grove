@@ -11,7 +11,12 @@ fn main() {
             .qml_file("src/Port.qml")
             .depend("QtQuick"),
     )
-    .files(["src/qml/backend.rs", "src/qml/light.rs", "src/qml/weather.rs"])
+    .files([
+        "src/qml/backend.rs",
+        "src/qml/garden.rs",
+        "src/qml/light.rs",
+        "src/qml/weather.rs",
+    ])
     .qt_module("Quick")
     .build();
 }
