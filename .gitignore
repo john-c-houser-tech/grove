@@ -2,3 +2,5 @@
 /pkgbuild/pkg/
 /pkgbuild/src/
 *.pkg.tar.*
+/target/
+/.qmlls.ini
