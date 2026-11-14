@@ -66,12 +66,15 @@ pub mod ffi {
 }
 
 use core::pin::Pin;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
 
 use cxx::UniquePtr;
 use cxx_qt_lib::{KeyboardModifiers, QImage, QQmlApplicationEngine, QString, QVariant};
 
-use super::{paint, script};
+use super::paint;
+use super::script::Expression;
 use crate::options::Options;
 
 /// The kind of an event, which Qt declares inside its event class.
@@ -186,6 +189,10 @@ impl Frame {
 /// The whole app with its real window, for a test to drive. The application
 /// must exist, and only one scene at a time.
 pub struct Scene {
+    /// The scripts the test has run, each made once: a test asks the same
+    /// few questions over and over while it waits, and the engine keeps what
+    /// it compiles for every script made.
+    scripts: RefCell<HashMap<String, Expression>>,
     engine: UniquePtr<QQmlApplicationEngine>,
     /// The window, which the engine owns.
     window: *mut cxx_qt::QObject,
@@ -199,7 +206,11 @@ impl Scene {
         super::shared::update(|app| app.set_muted(muted));
         let mut engine = QQmlApplicationEngine::new();
         let window = super::load_window(engine.as_mut()?)?.as_ptr();
-        let scene = Self { engine, window };
+        let scene = Self {
+            scripts: RefCell::default(),
+            engine,
+            window,
+        };
         // SAFETY: the window lives as long as the engine.
         unsafe { ffi::wait_for_window_exposed(scene.window.cast(), 5000) }.then_some(scene)
     }
@@ -235,25 +246,32 @@ impl Scene {
     /// properties are in reach, and returns its value. `find(name)` in it is
     /// the item of that object name, or null.
     pub fn evaluate(&self, script: &str) -> QVariant {
-        // Items are found by their object names, among the window's items.
-        let script = format!(
-            "(function() {{
-                function within(item, name) {{
-                    if (!item) return null
-                    if (item.objectName === name) return item
-                    const children = item.children || []
-                    for (let i = 0; i < children.length; ++i) {{
-                        const found = within(children[i], name)
-                        if (found) return found
+        let mut scripts = self.scripts.borrow_mut();
+        let expression = scripts.entry(script.to_string()).or_insert_with(|| {
+            // Items are found by their object names, among the window's items.
+            let wrapped = format!(
+                "(function() {{
+                    function within(item, name) {{
+                        if (!item) return null
+                        if (item.objectName === name) return item
+                        const children = item.children || []
+                        for (let i = 0; i < children.length; ++i) {{
+                            const found = within(children[i], name)
+                            if (found) return found
+                        }}
+                        return null
                     }}
-                    return null
-                }}
-                function find(name) {{ return within(win.contentItem, name) }}
-                return ({script})
-            }})()"
-        );
-        // SAFETY: the window lives as long as the engine this owns.
-        unsafe { script::evaluate(self.window, &script) }.unwrap_or_else(|| panic!("the script failed: {script}"))
+                    function find(name) {{ return within(win.contentItem, name) }}
+                    return ({script})
+                }})()"
+            );
+            // SAFETY: the window lives as long as the engine this owns, and
+            // the scripts are dropped before it.
+            unsafe { Expression::new(self.window, &wrapped) }.expect("the window is not QML's")
+        });
+        expression
+            .evaluate()
+            .unwrap_or_else(|| panic!("the script failed: {script}"))
     }
 
     /// Whether a piece of JavaScript in the window is true.
@@ -277,8 +295,10 @@ impl Scene {
 
 impl Drop for Scene {
     fn drop(&mut self) {
-        // The window goes with its engine; what it had queued for deletion
-        // is given a moment to go too.
+        // The scripts go before the window they run in, and the window with
+        // its engine; what it had queued for deletion is given a moment to
+        // go too.
+        self.scripts.borrow_mut().clear();
         self.engine = UniquePtr::null();
         wait(50);
     }

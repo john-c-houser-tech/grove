@@ -1,11 +1,12 @@
 #!/bin/sh
+# Builds Grove for release, and leaves the program at build/grove.
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-mkdir -p "$ROOT/build"
-cd "$ROOT/build"
+cd "$ROOT"
 
-qmake6 "$ROOT/grove.pro"
-make -j"$(nproc)"
+cargo build --release --locked
+mkdir -p build
+cp target/release/grove build/grove
 
 echo "Built $ROOT/build/grove"

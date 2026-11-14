@@ -3,7 +3,12 @@
 
 // The bridges declare Qt's own functions, each with its safety note beside
 // it; the bridge macro does not carry those notes onto what it generates.
-#![allow(clippy::missing_safety_doc)]
+#![expect(
+    clippy::missing_safety_doc,
+    reason = "the bridge macro drops the notes written beside each function"
+)]
+// Every unsafe block says why it is sound.
+#![warn(clippy::undocumented_unsafe_blocks)]
 
 pub mod app;
 pub mod color;
@@ -63,4 +68,21 @@ pub fn run() -> i32 {
     let code = application.as_mut().map_or(1, |application| application.exec());
     drop(engine);
     code
+}
+
+#[cfg(test)]
+mod tests {
+    /// Not a test of Grove: a leak planted for bin/check-leaks --canary,
+    /// which passes only if the leak check catches it, so a clean report
+    /// means something.
+    #[test]
+    fn leak_canary() {
+        if std::env::var_os("GROVE_LEAK_CANARY").is_none() {
+            return;
+        }
+        let lost = Box::new([b'x'; 1024]);
+        assert_eq!(lost.len(), 1024);
+        // The only pointer to it is dropped without freeing it.
+        std::mem::forget(lost);
+    }
 }

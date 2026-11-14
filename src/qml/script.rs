@@ -48,23 +48,45 @@ use cxx_qt_lib::{QString, QVariant};
 
 use super::shared;
 
-/// Runs a piece of JavaScript as part of the QML that made `object`, and
-/// returns its value; `None` if it failed, or the object is not QML's.
+/// A piece of JavaScript made ready to run as part of the QML that made an
+/// object. The engine keeps what it compiles for as long as it lives, so a
+/// script that is run again and again is made once and kept, not made anew
+/// each time.
+pub struct Expression(cxx::UniquePtr<ffi::QQmlExpression>);
+
+impl Expression {
+    /// Makes `script` ready to run in the context of `object`; `None` if the
+    /// object is not QML's.
+    ///
+    /// # Safety
+    /// `object` must be a live QObject, and outlive the expression.
+    pub unsafe fn new(object: *mut cxx_qt::QObject, script: &str) -> Option<Self> {
+        // SAFETY: the object is live by the caller's promise, and its
+        // context lives as long as it does.
+        unsafe {
+            let context = ffi::qml_context(object);
+            (!context.is_null()).then(|| Self(ffi::new_expression(context, object, &QString::from(script))))
+        }
+    }
+
+    /// Runs the script and returns its value; `None` if it failed.
+    pub fn evaluate(&mut self) -> Option<QVariant> {
+        // SAFETY: a null pointer says the caller does not ask whether the
+        // value was undefined.
+        let value = unsafe { self.0.pin_mut().evaluate(std::ptr::null_mut()) };
+        (!self.0.has_error()).then_some(value)
+    }
+}
+
+/// Runs a piece of JavaScript once, as part of the QML that made `object`,
+/// and returns its value; `None` if it failed, or the object is not QML's.
 ///
 /// # Safety
 /// `object` must be a live QObject.
 pub unsafe fn evaluate(object: *mut cxx_qt::QObject, script: &str) -> Option<QVariant> {
-    // SAFETY: the object is live by the caller's promise, its context lives
-    // as long as it does, and the expression is gone before this returns.
-    unsafe {
-        let context = ffi::qml_context(object);
-        if context.is_null() {
-            return None;
-        }
-        let mut expression = ffi::new_expression(context, object, &QString::from(script));
-        let value = expression.pin_mut().evaluate(std::ptr::null_mut());
-        (!expression.has_error()).then_some(value)
-    }
+    // SAFETY: the object is live by the caller's promise, and the
+    // expression is gone before this returns.
+    unsafe { Expression::new(object, script) }?.evaluate()
 }
 
 /// Starts the services that live in QML singletons, whatever the window's

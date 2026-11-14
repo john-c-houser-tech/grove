@@ -4,9 +4,11 @@ import glob, json, os, re, sys
 
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 source = ""
-for path in glob.glob(os.path.join(root, "src", "*.qml")) + glob.glob(os.path.join(root, "src", "*.cpp")):
+paths = glob.glob(os.path.join(root, "src", "*.qml")) + glob.glob(os.path.join(root, "src", "**", "*.rs"), recursive=True)
+for path in paths:
     source += open(path, encoding="utf-8").read()
-strings = set(re.findall(r'(?:qsTr|tr)\("((?:[^"\\]|\\.)*)"', source))
+# qsTr("...") in QML and tr("...") in Rust; not from_str("...") and the like.
+strings = set(re.findall(r'\b(?:qsTr|tr)\("((?:[^"\\]|\\.)*)"', source))
 
 failed = False
 for path in sorted(glob.glob(os.path.join(root, "src", "i18n", "*.json"))):

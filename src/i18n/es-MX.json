@@ -35,7 +35,6 @@
   "No desktop session bus, so Grove cannot send notifications.": "No hay bus de sesión del escritorio, así que Grove no puede enviar notificaciones.",
   "No notification service is running, so Grove cannot tell you when a plant is done.": "No hay un servicio de notificaciones en ejecución, así que Grove no puede avisarte cuando una planta termine.",
   "No audio output found, so the distant sounds are silent.": "No se encontró salida de audio, así que los sonidos lejanos están en silencio.",
-  "The audio output cannot play 16-bit sound, so the distant sounds are silent.": "La salida de audio no puede reproducir sonido de 16 bits, así que los sonidos lejanos están en silencio.",
   "Sounds are off. M turns them on.": "Los sonidos están desactivados. M los activa.",
   "Mute or unmute distant sounds": "Silenciar o activar los sonidos lejanos",
   "Another Grove kept the garden busy, so this plant was not saved.": "Otro Grove tenía ocupado el jardín, así que esta planta no se guardó.",

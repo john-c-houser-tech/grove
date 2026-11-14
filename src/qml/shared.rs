@@ -82,7 +82,7 @@ pub fn translation(source: &str, count: Option<i64>) -> Option<String> {
 }
 
 /// An English text in the current language. Every string Rust shows the user
-/// goes through here as a literal, `tr("...")`, which is how bin/check-i18n
+/// goes through here as a literal in the call, which is how bin/check-i18n
 /// finds it.
 pub fn tr(source: &str) -> String {
     translation(source, None).unwrap_or_else(|| source.to_string())

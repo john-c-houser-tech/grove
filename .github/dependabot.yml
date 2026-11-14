@@ -1,0 +1,14 @@
+# Keeps what Grove is built from up to date: the Rust crates in Cargo.lock,
+# and the actions CI runs. Pull requests go to dev, like any other change.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly

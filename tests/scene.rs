@@ -296,9 +296,130 @@ fn frames_for_readme(start: &Start) -> Ended {
     Ended::Passed
 }
 
+/// Bytes the program holds from the heap, including large blocks mapped on
+/// their own.
+fn heap_in_use() -> i64 {
+    // SAFETY: mallinfo2 only reads the allocator's own counters.
+    let info = unsafe { libc::mallinfo2() };
+    (info.uordblks + info.hblkhd) as i64
+}
+
+/// The heap once JavaScript garbage is collected and deferred deletes are
+/// done, so only what is really kept is counted.
+fn settled_heap(scene: &Scene) -> i64 {
+    for _ in 0..3 {
+        scene.evaluate("gc()");
+        wait(50);
+    }
+    heap_in_use()
+}
+
+/// The slope of the least-squares line through the readings, per reading.
+fn slope(values: &[i64]) -> f64 {
+    let n = values.len() as f64;
+    let (mut sum_x, mut sum_y, mut sum_xy, mut sum_xx) = (0.0, 0.0, 0.0, 0.0);
+    for (x, y) in values.iter().enumerate() {
+        let (x, y) = (x as f64, *y as f64);
+        sum_x += x;
+        sum_y += y;
+        sum_xy += x * y;
+        sum_xx += x * x;
+    }
+    (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
+}
+
+/// Memory still referenced but never let go, which no leak checker sees,
+/// shows as a heap that keeps growing. The heap is read after each of forty
+/// rounds of one part of a day (opening the garden, giving up, or finishing)
+/// once garbage is collected and deferred deletes are done, and the line
+/// through those readings must rise less than 10 KB a round. A garden tile
+/// with its plant is about 100 KB, so losing one a round would show; caches
+/// filling up early and then holding steady do not. It takes a minute or
+/// more, so bin/check-leaks runs it (GROVE_SOAK=1) rather than bin/test.
+fn repeating_the_day_does_not_grow_the_heap(start: &Start, part: &str) -> Ended {
+    if std::env::var_os("GROVE_SOAK").is_none() {
+        return Ended::Skipped("set GROVE_SOAK=1 to run; bin/check-leaks does");
+    }
+    let scene = start.scene(1);
+    for seed in 1..=6 {
+        record(plant(seed));
+    }
+    let once = || match part {
+        "garden" => {
+            scene.press(Key::G);
+            assert!(
+                wait_until(5000, || scene.is("find('gardenLoader').item")),
+                "the garden did not open"
+            );
+            scene.press(Key::Escape);
+            assert!(
+                wait_until(5000, || !scene.is("find('gardenLoader').item")),
+                "the garden did not close"
+            );
+        }
+        "giveup" => {
+            scene.press(Key::Space);
+            scene.press(Key::Space);
+            assert!(wait_until(5000, || scene.is("confirm.opened")), "giving up did not ask");
+            scene.press(Key::Return);
+            assert!(
+                wait_until(5000, || !scene.is("confirm.opened")),
+                "the question did not close"
+            );
+        }
+        _ => {
+            scene.press(Key::Space);
+            assert!(
+                wait_until(3000, || state() == State::Done),
+                "the session never finished"
+            );
+        }
+    };
+    for _ in 0..5 {
+        once();
+    }
+    // For bin/check-leaks --canary: keep a garden tile's worth a round, to
+    // show that the test sees memory kept like that.
+    let canary = std::env::var_os("GROVE_LEAK_CANARY").is_some();
+    let mut kept = Vec::new();
+    let mut heap = Vec::new();
+    let times = 40;
+    for _ in 0..times {
+        once();
+        if canary {
+            kept.push(vec![b'x'; 100 * 1024]);
+        }
+        heap.push(settled_heap(&scene));
+    }
+    let per_round = slope(&heap);
+    println!(
+        "{part} x{times}: heap grew by {} bytes, {per_round:.0} bytes a round",
+        heap[heap.len() - 1] - heap[0]
+    );
+    // The readings themselves say whether a rise is steady or a single step.
+    let readings: Vec<i64> = heap.iter().map(|bytes| (bytes - heap[0]) / 1024).collect();
+    assert!(
+        per_round < 10.0 * 1024.0,
+        "rising {per_round:.0} bytes a round; KB over the first reading: {readings:?}"
+    );
+    Ended::Passed
+}
+
+fn soak_garden(start: &Start) -> Ended {
+    repeating_the_day_does_not_grow_the_heap(start, "garden")
+}
+
+fn soak_giveup(start: &Start) -> Ended {
+    repeating_the_day_does_not_grow_the_heap(start, "giveup")
+}
+
+fn soak_finish(start: &Start) -> Ended {
+    repeating_the_day_does_not_grow_the_heap(start, "finish")
+}
+
 type Test = fn(&Start) -> Ended;
 
-const TESTS: [(&str, Test); 8] = [
+const TESTS: [(&str, Test); 11] = [
     (
         "every_service_is_started_with_the_window",
         every_service_is_started_with_the_window,
@@ -317,6 +438,9 @@ const TESTS: [(&str, Test); 8] = [
         the_garden_opens_takes_the_keys_and_closes,
     ),
     ("the_landscape_is_drawn", the_landscape_is_drawn),
+    ("soak_garden", soak_garden),
+    ("soak_giveup", soak_giveup),
+    ("soak_finish", soak_finish),
     ("frames_for_review", frames_for_review),
     ("frames_for_readme", frames_for_readme),
 ];

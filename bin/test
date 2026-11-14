@@ -1,18 +1,11 @@
 #!/bin/sh
+# The unit tests, and the scene tests: the whole app with its real window,
+# driven by keys. Nothing is shown on the desktop: the scene tests keep
+# themselves offscreen however they are started. Arguments go to cargo test,
+# as in: bin/test --test scene -- frames_for_review
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+cd "$ROOT"
 
-# Nothing is shown on the desktop: both programs run on the offscreen
-# platform, and the scene tests draw with the GPU renderer, as on screen.
-export QT_QPA_PLATFORM=offscreen
-export QT_QUICK_BACKEND=rhi
-export QSG_RHI_BACKEND=opengl
-
-for suite in grove_tests scene_tests; do
-    mkdir -p "$ROOT/build/$suite"
-    cd "$ROOT/build/$suite"
-    qmake6 "$ROOT/tests/$suite.pro" >/dev/null
-    make -j"$(nproc)" >/dev/null
-    ./"$suite" "$@"
-done
+exec cargo test --locked "$@"
