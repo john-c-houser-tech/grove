@@ -7,6 +7,12 @@ in a furrow of the ploughed field.
 Stay with it for 25 minutes and the plant blooms; give up and it wilts. Either
 way it stays in your garden.
 
+> [!NOTE]
+> Grove was first written in C++ and then ported to Rust. The port was done as
+> an experiment to learn about Rust, and the Rust version of the application
+> should not be taken as a finished application. What the port taught us is in
+> [the Rust port review](docs/rust-port-review.md).
+
 - **A view.** Distant peaks wear snow in winter, with rolling ridges and a
   hillside nearer in, each hazier with distance and lit like the rest.
 - **Light follows the clock.** Dawn, noon, golden hour and night, with dusk

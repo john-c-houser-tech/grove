@@ -1,0 +1,323 @@
+<title>Grove Rust Port Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column on a granite ground; the scene picture sits beside the opening at desktop width. */
+:root {
+  --bg: #f4f6f3;          /* pale granite with a moss bias */
+  --surface: #ffffff;
+  --fg: #1d2523;
+  --muted: #56625e;
+  --rule: #d6ddd8;
+  --moss: #3f6b4a;        /* the plant */
+  --copper: #a2532b;      /* the rust */
+  --note-bg: #fbf1e8;
+  --note-edge: #e2b896;
+  --bar-cpp: #8aa596;
+  --bar-cpp-2: #c4d3c9;
+  --bar-rules: #3f6b4a;
+  --bar-bridge: #a2532b;
+  --bar-tests: #d9a37f;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141a19; --surface: #1c2422; --fg: #e3e9e5; --muted: #9eaba6; --rule: #2f3a37;
+    --moss: #86b894; --copper: #e08f62; --note-bg: #2a2019; --note-edge: #7a4a2e;
+    --bar-cpp: #6f8b7c; --bar-cpp-2: #3d4f46; --bar-rules: #6fa47d; --bar-bridge: #c9774b; --bar-tests: #8f6448;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141a19; --surface: #1c2422; --fg: #e3e9e5; --muted: #9eaba6; --rule: #2f3a37;
+  --moss: #86b894; --copper: #e08f62; --note-bg: #2a2019; --note-edge: #7a4a2e;
+  --bar-cpp: #6f8b7c; --bar-cpp-2: #3d4f46; --bar-rules: #6fa47d; --bar-bridge: #c9774b; --bar-tests: #8f6448;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.page {
+  max-width: 54rem;
+  margin: 0 auto;
+  padding-block: 3rem 4rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 3rem;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.1rem, 5vw, 3rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.55rem; font-weight: 700; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 65ch; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0.05em 0.3em; overflow-wrap: anywhere; }
+a { color: var(--moss); }
+a:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* Opening */
+.opening { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 2rem; align-items: start; }
+.opening .text { display: grid; gap: 1rem; min-width: 0; }
+.lede { font-size: 1.15rem; color: var(--fg); }
+.opening figure { margin: 0; display: grid; gap: 0.4rem; }
+.opening img { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--rule); display: block; }
+.opening figcaption { font-size: 0.8rem; color: var(--muted); }
+@media (max-width: 640px) {
+  .opening { grid-template-columns: 1fr; }
+  .opening figure { max-width: 18rem; }
+}
+
+/* The experiment note */
+.note {
+  background: var(--note-bg);
+  border: 1px solid var(--note-edge);
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.note h2 { font-size: 1.1rem; color: var(--copper); }
+
+section { display: grid; gap: 1.1rem; min-width: 0; }
+section > header { display: grid; gap: 0.35rem; border-top: 1px solid var(--rule); padding-top: 1.5rem; }
+
+/* Table */
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.93rem; }
+th, td { text-align: left; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+thead th { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+tbody th { font-weight: 500; color: var(--muted); width: 30%; }
+td { font-variant-numeric: tabular-nums; }
+
+/* Line-count bars, drawn to one scale (10,664 lines = full width) */
+.bars { display: grid; gap: 1rem; }
+.bar-row { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.75rem; align-items: center; }
+.bar-label { font-family: var(--font-mono); font-size: 0.85rem; }
+.bar-label span { display: block; color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 1.6rem; border-radius: 4px; overflow: hidden; background: transparent; }
+.bar i { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; font-size: 0.82rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.legend b { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; }
+.fine { font-size: 0.82rem; color: var(--muted); }
+
+/* Lists of findings */
+.findings { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; }
+.findings li { display: grid; gap: 0.3rem; padding-left: 1rem; border-left: 2px solid var(--rule); }
+.findings li p, .findings li ul { max-width: 65ch; }
+.findings ul { margin: 0.2rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.2rem; }
+.limits li { border-left-color: var(--copper); }
+.ideas li { border-left-color: var(--moss); }
+
+.bottom { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 1.25rem; display: grid; gap: 0.6rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 1.25rem; display: grid; gap: 0.3rem; }
+</style>
+
+<main class="page">
+
+  <div class="opening">
+    <div class="text">
+      <p class="eyebrow">Grove · C++ 0.9.0 → Rust 0.10.0 · November 2026</p>
+      <h1>Grove Rust Port Review</h1>
+      <p class="lede">Grove is a focus timer for Omarchy that grows a plant in a mountain landscape while you work. On 13 November 2026 its C++ code was rewritten in Rust, keeping the Qt Quick window as it was. This page compares the two versions, lists what we learned and what got in the way, and suggests how Rust could serve this kind of program better.</p>
+    </div>
+    <figure>
+      <img src="grove.png" alt="The Grove window: a plant growing in a field below snow-capped mountains, with a train track and hills." width="760" height="760">
+      <figcaption>The scene looks the same in both builds.</figcaption>
+    </figure>
+  </div>
+
+  <aside class="note" aria-labelledby="note-title">
+    <h2 id="note-title">An experiment</h2>
+    <p>This port was done as an experiment to learn about Rust. The Rust version of Grove should not be taken as a finished application.</p>
+  </aside>
+
+  <section aria-labelledby="glance">
+    <header>
+      <p class="eyebrow">Side by side</p>
+      <h2 id="glance">The two versions</h2>
+    </header>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th scope="col"></th><th scope="col">C++ 0.9.0</th><th scope="col">Rust 0.10.0</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Hand-written code, excluding QML</th><td>4,565 lines</td><td>10,664 lines</td></tr>
+          <tr><th scope="row">QML</th><td>1,818 lines</td><td>Same files, two small edits</td></tr>
+          <tr><th scope="row">Libraries</th><td>Qt only: sound, D-Bus, file watching and sockets all from Qt</td><td>Qt plus 170 crates (zbus, rodio and cpal, notify, serde_json, chrono, fastrand)</td></tr>
+          <tr><th scope="row">Program size, stripped</th><td>0.43 MB</td><td>5.1 MB, about 12 times larger</td></tr>
+          <tr><th scope="row">Package</th><td>189 KB</td><td>1.7 MB</td></tr>
+          <tr><th scope="row">Release build</th><td>Quick</td><td>About 3 minutes</td></tr>
+          <tr><th scope="row">Tests</th><td>Unit and scene tests</td><td>133 unit and 12 scene tests, a Valgrind leak check and a soak test</td></tr>
+          <tr><th scope="row"><code>unsafe</code></th><td>Not applicable</td><td>74 uses, all in the Qt connection code under <code>src/qml/</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bars" role="img" aria-label="Lines of hand-written code. C++: 3,487 app and 1,078 tests. Rust: 5,160 app logic, 4,700 Qt connection code and 757 scene tests.">
+      <div class="bar-row">
+        <div class="bar-label">C++<span>4,565</span></div>
+        <div class="bar"><i style="width:32.7%;background:var(--bar-cpp)"></i><i style="width:10.1%;background:var(--bar-cpp-2)"></i></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Rust<span>10,664</span></div>
+        <div class="bar"><i style="width:48.4%;background:var(--bar-rules)"></i><i style="width:44.1%;background:var(--bar-bridge)"></i><i style="width:7.1%;background:var(--bar-tests)"></i></div>
+      </div>
+      <div class="legend">
+        <span><b style="background:var(--bar-cpp)"></b>C++ app, 3,487</span>
+        <span><b style="background:var(--bar-cpp-2)"></b>C++ tests, 1,078</span>
+        <span><b style="background:var(--bar-rules)"></b>Rust app logic, 5,160</span>
+        <span><b style="background:var(--bar-bridge)"></b>Rust Qt connection code, 4,700</span>
+        <span><b style="background:var(--bar-tests)"></b>Rust scene tests, 757</span>
+      </div>
+      <p class="fine">Rust keeps its unit tests in the same files as the code, so the app logic count includes them. The C++ count keeps its tests separate.</p>
+    </div>
+
+    <p>The landscape came out identical. The hills, field and track bed matched the C++ drawings pixel for pixel (0 differing pixels across 11 pictures). Whole-window frames differed by no more than the C++ build differs from itself between runs.</p>
+  </section>
+
+  <section aria-labelledby="learned">
+    <header>
+      <p class="eyebrow">Findings</p>
+      <h2 id="learned">What we learned</h2>
+    </header>
+    <ol class="findings">
+      <li>
+        <h3>The real gain came from separating the logic from Qt</h3>
+        <p>Session, weather, light, garden, sounds and theme parsing are now plain Rust with no Qt in them, so they can be tested with <code>cargo test</code> alone. <code>App::advance</code> returns events and runs no timers, which makes timing testable. We could have done this in C++, but the port forced it.</p>
+      </li>
+      <li>
+        <h3>Rust kept memory errors out of the logic, but most of our bugs weren't memory errors</h3>
+        <p>Two rounds of independent review found logic and Qt-behavior bugs:</p>
+        <ul>
+          <li>the file watcher woke itself up by reading the files it watches, so the app reloaded endlessly and kept starting hyprctl</li>
+          <li>QML singletons weren't actually created</li>
+          <li>building a new <code>QQmlExpression</code> on every call leaked about 66 KB per round</li>
+        </ul>
+        <p>Rust doesn't count leaks as unsafe, so we still needed Valgrind and the soak test.</p>
+      </li>
+      <li>
+        <h3>The risky code is still at the edge, now marked <code>unsafe</code></h3>
+        <p>Object ownership, threads, the scene graph and Qt calling back into our code are where a Qt app actually breaks. That's exactly where all 74 <code>unsafe</code> uses are.</p>
+      </li>
+      <li>
+        <h3>Replacing Qt modules with crates means relearning each one's quirks</h3>
+        <p>Qt's D-Bus, audio and file-watching pieces were designed to work together. Their crate replacements each needed their own fixes:</p>
+        <ul>
+          <li>zbus is async-only and has no default timeout, so we added one (25 s)</li>
+          <li>cpal reports harmless errors through the same path as fatal ones</li>
+          <li>notify reports file opens, which caused the self-wake bug above</li>
+        </ul>
+        <p>In exchange we dropped the qt6-multimedia dependency, and <code>cargo audit</code> plus Dependabot now cover 170 crates.</p>
+      </li>
+      <li>
+        <h3>The port fixed one old bug</h3>
+        <p>The C++ session clock ran about 1% long; the Rust one doesn't.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="limits">
+    <header>
+      <p class="eyebrow">Friction</p>
+      <h2 id="limits">Limitations we ran into</h2>
+    </header>
+    <ul class="findings limits">
+      <li>
+        <h3>Gaps in cxx-qt-lib</h3>
+        <p>cxx-qt-lib is the crate that provides ready-made Qt types for Rust. It has no <code>tr()</code> or translate, no QIcon (so the X11 window icon was dropped), no <code>QPainterPath::moveTo</code>, no fractional-width QPen and no <code>QLocale::setDefault</code>. That last gap forced the QML change to <code>Qt.locale(Translator.locale)</code>. QTest isn't covered either.</p>
+      </li>
+      <li>
+        <h3>Qt's C++ class structure doesn't translate</h3>
+        <p>Nested types like <code>QQuickItem::Flag</code> and <code>UpdatePaintNodeData</code> can't be declared normally and needed hand-written <code>ExternType</code> code. Calling static methods needed a workaround type. Generated names (<code>&lt;type&gt;$&lt;fn&gt;</code>) clash, which forced <code>q_</code> name prefixes. Creating Qt objects goes through cxx-qt-lib's internal <code>rust::cxxqtlib1::make_unique</code>.</p>
+      </li>
+      <li>
+        <h3>Mistakes in the setup fail late</h3>
+        <p>A connection file missing from <code>build.rs</code> only shows up at runtime as "X is not defined" in QML. A QML singleton isn't created until something reads it, hence <code>start_services</code>.</p>
+      </li>
+      <li>
+        <h3>The package now breaks on Qt upgrades</h3>
+        <p>cxx-qt-build can't pass <code>--only-bytecode</code> to qmlcachegen, so the program uses three private Qt functions. It has to be rebuilt after every Qt upgrade, which is why the package ships a pacman hook that reminds you.</p>
+      </li>
+      <li>
+        <h3>No link-time optimization</h3>
+        <p>Rust's linker can't link the GCC LTO output from the generated C++, so the PKGBUILD has <code>!lto</code>.</p>
+      </li>
+      <li>
+        <h3>"No C++" only covers code we write</h3>
+        <p>cxx-qt still generates C++, so a C++ compiler is still required to build.</p>
+      </li>
+      <li>
+        <h3>The tools cost more</h3>
+        <p>The program is 12 times bigger and builds slowly. Memory-error checkers (sanitizers) need nightly Rust, so Valgrind does that job. Also, rustfmt breaks long chains even with <code>max_width</code> set to 120.</p>
+      </li>
+      <li>
+        <h3>Small behavior change</h3>
+        <p>Random weather now comes from fastrand, so a given seed produces different weather than in C++. Saved plants aren't affected.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="improve">
+    <header>
+      <p class="eyebrow">Looking ahead</p>
+      <h2 id="improve">How Rust could work better for this kind of app</h2>
+      <p>This kind of app is a thin layer of logic under a large C++ UI framework.</p>
+    </header>
+    <ul class="findings ideas">
+      <li>
+        <h3>Calling C++ directly</h3>
+        <p>Most of the extra code exists because Rust can't directly use C++ classes, inheritance, virtual methods, nested types or templates. The Rust Foundation's C++ interop work and tools like Crubit aim at this. Being able to subclass and override C++ methods directly would remove most of <code>src/qml/</code>.</p>
+      </li>
+      <li>
+        <h3>Objects that call back into themselves</h3>
+        <p>Qt signals often call back into an object that's already in use. Rust's borrowing rules don't allow that, so cxx-qt uses <code>Pin&lt;&amp;mut&gt;</code>, and we used queued signals and model snapshots. The "pin ergonomics" work in progress would ease some of this.</p>
+      </li>
+      <li>
+        <h3>Sanitizers on stable Rust</h3>
+        <p>Leak and thread checks then wouldn't depend on Valgrind.</p>
+      </li>
+      <li>
+        <h3>Shared Rust libraries for distributions</h3>
+        <p>Rust has no stable ABI, so every app ships its own copy of zbus, cpal and the rest. That accounts for most of the 12 times larger program. The crABI proposal would help here.</p>
+      </li>
+      <li>
+        <h3>Async that fits into an existing event loop</h3>
+        <p>zbus brings its own runtime alongside Qt's event loop. A standard way to run Rust async code on a GUI's event loop would remove our D-Bus thread.</p>
+      </li>
+      <li>
+        <h3>In the tools around Rust</h3>
+        <p>Wider cxx-qt-lib coverage and a qmlcachegen bytecode-only option would fix the icon, translation and Qt-upgrade problems.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="bottom">
+    <div class="bottom">
+      <h2 id="bottom">Bottom line</h2>
+      <p>The logic layer was the payoff: it's testable, has no <code>unsafe</code>, and caught the clock bug. The Qt connection code cost us the most: more than twice the lines, a program 12 times bigger, a rebuild after every Qt upgrade, and a lot of hand-written binding code.</p>
+      <p>For the next round of work this matters mainly when we use a Qt API we haven't connected yet. QML changes and new drawing in the existing layers won't run into it.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Compared: the C++ source at tag <code>cpp-0.9.0</code> (commit 1c40ab5) and the Rust code merged to dev in PR #7 (commit 4ae3bbb).</p>
+    <p>Line counts exclude QML, build scripts and generated code.</p>
+  </footer>
+
+</main>
