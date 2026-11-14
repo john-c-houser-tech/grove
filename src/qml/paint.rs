@@ -414,6 +414,49 @@ impl Painter<'_> {
     }
 }
 
+/// Colours mixed and darkened the way QML does it, so a layer drawn here
+/// agrees with what the window draws beside it.
+pub mod color {
+    use cxx_qt_lib::QColor;
+
+    /// A colour from components, clamped as Qt.rgba() clamps them.
+    pub fn rgba(r: f64, g: f64, b: f64, a: f64) -> QColor {
+        let unit = |v: f64| v.clamp(0.0, 1.0) as f32;
+        QColor::from_rgba_f(unit(r), unit(g), unit(b), unit(a))
+    }
+
+    /// From `a` toward `b` by `t`, opaque.
+    pub fn mix(a: &QColor, b: &QColor, t: f64) -> QColor {
+        let towards = |from: f32, to: f32| f64::from(from) + (f64::from(to) - f64::from(from)) * t;
+        rgba(
+            towards(a.red_f(), b.red_f()),
+            towards(a.green_f(), b.green_f()),
+            towards(a.blue_f(), b.blue_f()),
+            1.0,
+        )
+    }
+
+    /// The same colour with another alpha.
+    pub fn with_alpha(color: &QColor, alpha: f64) -> QColor {
+        rgba(
+            f64::from(color.red_f()),
+            f64::from(color.green_f()),
+            f64::from(color.blue_f()),
+            alpha,
+        )
+    }
+
+    /// Qt.darker(): 1.5 is half again as dark.
+    pub fn darker(color: &QColor, factor: f64) -> QColor {
+        color.darker((factor * 100.0).round() as i32)
+    }
+
+    /// Qt.lighter(): 1.5 is half again as light.
+    pub fn lighter(color: &QColor, factor: f64) -> QColor {
+        color.lighter((factor * 100.0).round() as i32)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

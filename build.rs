@@ -14,6 +14,7 @@ fn main() {
     .files([
         "src/qml/backend.rs",
         "src/qml/garden.rs",
+        "src/qml/layers.rs",
         "src/qml/light.rs",
         "src/qml/notifier.rs",
         "src/qml/paint.rs",

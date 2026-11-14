@@ -4,6 +4,9 @@
 pub mod backend;
 mod color;
 pub mod garden;
+mod hills;
+mod layer;
+pub mod layers;
 pub mod light;
 pub mod notifier;
 pub mod paint;

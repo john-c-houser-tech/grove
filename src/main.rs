@@ -15,6 +15,7 @@ mod session;
 mod settings;
 mod sounds;
 mod synth;
+mod terrain;
 mod theme;
 mod weather;
 
