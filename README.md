@@ -97,5 +97,10 @@ run by hand.
 
 ## License
 
-MIT. The build layout and theme and language watching follow Omacut and
-Monologue by David Heinemeier Hansson, also MIT.
+MIT. The theme and language watching follow Omacut and Monologue by David
+Heinemeier Hansson, also MIT.
+
+Grove is built against the Qt on the machine it is built on, and uses Qt's
+compiled QML, which reaches into Qt's internals. After an upgrade of Qt,
+rebuild it with `bin/install`; the package installs a pacman hook that says
+so when Qt is upgraded.

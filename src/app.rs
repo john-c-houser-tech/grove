@@ -432,6 +432,7 @@ mod tests {
             sound_test: None,
             sound_volume: 1.0,
             settings_file: None,
+            silent: false,
         }
     }
 

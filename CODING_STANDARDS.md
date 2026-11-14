@@ -20,7 +20,8 @@ anything that lives as long as the app.
 
 Don't argue with `rustfmt`. A clippy lint is switched off only where it
 cannot be met, with the reason beside it: `#[expect(lint, reason = "...")]`
-on the item, so the exemption goes when its cause does. A single exemption in
+on the item, so the exemption goes when its cause does, or on the crate
+where the code a macro generates is what trips it (`src/lib.rs`). A single exemption in
 QML (`// qmllint disable`) names the check and says why on the same or the
 line before.
 
@@ -47,8 +48,10 @@ wrote it:
    as a Rust type with `unsafe impl cxx::ExternType`, and named in the bridge
    with `#[namespace = "QQuickItem"]` (`layer.rs`).
 5. A class `cxx-qt-lib` also binds gets its own Rust name here and its
-   methods a `q_` prefix, so the generated symbols differ; it is never owned
-   through a `UniquePtr` of its own (`paint.rs`).
+   methods a `q_` prefix, so the generated symbols differ. Where
+   `cxx-qt-lib` already owns that class through a `UniquePtr` (`QPainter`),
+   it is owned through `cxx-qt-lib`'s and cast for the calls declared here,
+   since a second `UniquePtr` of it collides too (`paint.rs`).
 
 ## Memory, ownership and unsafe code
 
@@ -102,7 +105,8 @@ wrote it:
 - `pragma ComponentBehavior: Bound` wherever there are delegates. Delegates
   declare what they use as `required property`, and reach other objects'
   properties through their ids.
-- `let` and `const` in scripts, never `var`.
+- `let` and `const` in scripts, never `var`. Some older scripts still use
+  `var`; they are changed as they are touched.
 - Numbers and dates are formatted with `Qt.locale(Translator.locale)`: Rust
   cannot set Qt's default locale.
 - No warnings at run time. The scene tests fail on any.
@@ -132,8 +136,10 @@ wrote it:
 - `GROVE_LAYER_SHOTS=dir bin/test frames_for_comparison` saves each layer's
   own picture, for comparing a layer pixel for pixel across two builds.
 - Tests never touch the user's garden, theme, language, notifications or
-  settings: `Options` points each at the test's own, and an `Options` made
-  from nothing reaches nothing of the desktop's.
+  settings: each test's `Options` points every one of them at the test's own,
+  and plays sounds to no one (`silent`). `Options::default()` is not enough
+  on its own: it names the desktop's notification service and opens the
+  real audio device.
 - A scene test that asks the window the same question many times asks it
   through `Scene`, which makes each script once: the QML engine keeps what it
   compiles for every script made.

@@ -115,6 +115,8 @@ pub struct State {
     /// A finished drawing waiting to become a texture; `Some(None)` when
     /// there was nothing to draw, and the texture should go.
     ready: Option<Option<Picture>>,
+    /// The last drawing had nothing in it, so the layer shows no node.
+    shows_nothing: bool,
 }
 
 /// A QML item that is a layer.
@@ -264,8 +266,17 @@ pub fn draw(painting: Painting, width: f64, height: f64, covered_from: f64, rati
 /// `old` must be null or the node this layer returned last time.
 pub unsafe fn update_paint_node<L: Layer>(mut layer: Pin<&mut L>, old: *mut QSGNode) -> *mut QSGNode {
     let Some(ready) = layer.as_mut().state().ready.take() else {
+        // No node to keep, nothing on its way, and something to show: the
+        // scene graph has let the layer's node go (the window's resources
+        // were released, or the GPU was reset), and the picture went with
+        // it, since none is kept once it is a texture. It is drawn again.
+        let state = layer.as_mut().state();
+        if old.is_null() && !state.shows_nothing && !state.drawing && !state.scheduled {
+            schedule_render(layer);
+        }
         return old;
     };
+    layer.as_mut().state().shows_nothing = ready.is_none();
     // The only node a layer ever returns is a texture node, and a texture
     // node is a node first.
     let node = old.cast::<QSGSimpleTextureNode>();

@@ -61,7 +61,7 @@ use cxx_qt_lib::QString;
 
 use super::shared::{self, tr};
 use crate::app::Event;
-use crate::player::{Player, Problem, Report};
+use crate::player::{Player, Problem, Report, Silence};
 use crate::session::State;
 use crate::sounds::Kind;
 
@@ -76,9 +76,14 @@ impl cxx_qt::Initialize for qobject::Sounds {
         shared::started("Sounds");
         // The player reports from its own thread; the news is carried here.
         let gui = self.qt_thread();
-        let player = Player::new(move |report| {
-            let _ = gui.queue(move |sounds| sounds.reported(report));
-        });
+        let report = move |report| {
+            let _ = gui.queue(move |sounds: Pin<&mut qobject::Sounds>| sounds.reported(report));
+        };
+        let player = if shared::read(|app| app.options().silent) {
+            Player::with_output(Silence::default, report)
+        } else {
+            Player::new(report)
+        };
         player.set_muted(shared::read(|app| app.muted()));
         self.as_mut().rust_mut().player = Some(player);
 

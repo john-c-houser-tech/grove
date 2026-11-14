@@ -273,6 +273,53 @@ fn a_train_passes_even_when_muted(start: &Start) -> Ended {
     Ended::Passed
 }
 
+fn a_right_to_left_language_mirrors_the_window(start: &Start) -> Ended {
+    let options = start.options(10);
+    std::fs::write(options.language_file.as_ref().unwrap(), "ar\n").unwrap();
+    let scene = start.open(options);
+    assert!(scene.is("Translator.rightToLeft"));
+    assert!(scene.is("Qt.application.layoutDirection === Qt.RightToLeft"));
+    // The window's own locale is the language's, as Qt's default was the
+    // language's for the C++ Grove: controls that format by it agree.
+    assert!(
+        scene.text("win.locale.name").starts_with("ar"),
+        "{}",
+        scene.text("win.locale.name")
+    );
+    // The window's content mirrors. Qt does not mirror its dialogs by the
+    // locale, whatever the default: the C++ Grove's give-up dialog read left
+    // to right in Arabic too.
+    assert!(scene.is("find('heading').parent.LayoutMirroring.enabled"));
+    Ended::Passed
+}
+
+fn an_unmuted_train_is_seen_as_it_is_heard(start: &Start) -> Ended {
+    // Played to no one: everything around the sound happens as it would.
+    let options = Options {
+        sound_test: Some(grove::sounds::Kind::Train),
+        silent: true,
+        ..start.options(60)
+    };
+    let scene = Scene::open(options, false).expect("the window was not shown");
+    assert!(!scene.is("Sounds.muted"));
+    scene.press(Key::Space);
+    // The picture starts when the player says the sound has.
+    assert!(
+        wait_until(8000, || scene.is("find('train').running")),
+        "no train passed"
+    );
+    assert_eq!(scene.text("Sounds.problem"), "");
+    // Giving up fades the train away with its sound.
+    scene.press(Key::Space);
+    assert!(wait_until(5000, || scene.is("confirm.opened")), "giving up did not ask");
+    scene.press(Key::Return);
+    assert!(
+        wait_until(8000, || !scene.is("find('train').running")),
+        "the train did not leave"
+    );
+    Ended::Passed
+}
+
 fn the_landscape_is_drawn(start: &Start) -> Ended {
     let scene = start.scene(10);
     // The layers draw on another thread; the field brings many tones to the
@@ -345,11 +392,12 @@ fn frames_for_readme(start: &Start) -> Ended {
         return Ended::Skipped("set GROVE_README_SHOTS to a folder to save the README's pictures");
     };
     std::fs::create_dir_all(&out).expect("the folder for the pictures");
-    // Sound stays on but silent, so the window shows no "sounds are off".
+    // Sound stays on, played to no one, so the window shows no "sounds are
+    // off" and no audio device is opened.
     let unmuted = |options: Options| {
         Scene::open(
             Options {
-                sound_volume: 0.0,
+                silent: true,
                 ..options
             },
             false,
@@ -521,7 +569,7 @@ fn soak_finish(start: &Start) -> Ended {
 
 type Test = fn(&Start) -> Ended;
 
-const TESTS: [(&str, Test); 15] = [
+const TESTS: [(&str, Test); 17] = [
     (
         "every_service_is_started_with_the_window",
         every_service_is_started_with_the_window,
@@ -549,6 +597,14 @@ const TESTS: [(&str, Test); 15] = [
         the_theme_is_followed_while_the_window_is_open,
     ),
     ("a_train_passes_even_when_muted", a_train_passes_even_when_muted),
+    (
+        "a_right_to_left_language_mirrors_the_window",
+        a_right_to_left_language_mirrors_the_window,
+    ),
+    (
+        "an_unmuted_train_is_seen_as_it_is_heard",
+        an_unmuted_train_is_seen_as_it_is_heard,
+    ),
     ("the_landscape_is_drawn", the_landscape_is_drawn),
     ("soak_garden", soak_garden),
     ("soak_giveup", soak_giveup),
@@ -556,6 +612,10 @@ const TESTS: [(&str, Test); 15] = [
     ("frames_for_review", frames_for_review),
     ("frames_for_readme", frames_for_readme),
 ];
+
+/// The line `Said::since` writes to know that everything before it has come
+/// through.
+const END: &str = "-- end of what was said --";
 
 /// Everything written to standard error, which is where Qt says what it has
 /// to say. The lines are passed on, and kept for the tests to look through.
@@ -584,7 +644,9 @@ impl Said {
         let kept = Arc::clone(&lines);
         std::thread::spawn(move || {
             for line in BufReader::new(heard).lines().map_while(Result::ok) {
-                let _ = writeln!(passed_on, "{line}");
+                if line != END {
+                    let _ = writeln!(passed_on, "{line}");
+                }
                 kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).push(line);
             }
         });
@@ -596,11 +658,26 @@ impl Said {
         self.lines.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).len()
     }
 
-    /// The lines said since a mark.
+    /// The lines said since a mark. Everything written before this call is
+    /// among them: a line of its own goes through the pipe behind it, and
+    /// is waited for.
     fn since(&self, mark: usize) -> Vec<String> {
-        // What was just written takes a moment to come through the pipe.
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        self.lines.lock().unwrap_or_else(|poisoned| poisoned.into_inner())[mark..].to_vec()
+        eprintln!("{END}");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            {
+                let mut lines = self.lines.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                if let Some(end) = lines.iter().skip(mark).position(|line| line == END) {
+                    lines.remove(mark + end);
+                    return lines[mark..mark + end].to_vec();
+                }
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "standard error stopped coming through"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
     }
 }
 
@@ -661,7 +738,17 @@ fn main() {
             }
         }
     }
+    // What Qt says while it takes itself down counts too.
+    let mark = said.mark();
     drop(application);
+    let last_words = said.since(mark);
+    if !last_words.is_empty() {
+        println!("Qt had something to say as the application went:");
+        for line in &last_words {
+            println!("    {line}");
+        }
+        failed.push("(the application's exit)");
+    }
     println!(
         "\nscene tests: {passed} passed, {} failed, {skipped} skipped",
         failed.len()

@@ -3,6 +3,9 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+# Cargo builds into the repository's own target/, which the rest of this
+# script reads from, whatever the environment says elsewhere.
+export CARGO_TARGET_DIR="$ROOT/target"
 cd "$ROOT"
 
 cargo build --release --locked

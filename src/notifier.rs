@@ -4,10 +4,13 @@
 
 use std::collections::HashMap;
 
-use zbus::{Connection, Variant};
+use zbus::Variant;
 
 /// The desktop's notification service; only tests name another.
 pub const SERVICE: &str = "org.freedesktop.Notifications";
+
+/// How long the notification service has to answer.
+const ANSWER_WAIT: std::time::Duration = std::time::Duration::from_secs(25);
 
 /// Why a notification could not be sent, for the window to put into words.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,7 +27,13 @@ pub enum Problem {
 /// a day of sessions never stacks up. Returns the new notification's id.
 pub fn send(service: &str, replaces: u32, summary: &str, body: &str) -> Result<u32, Problem> {
     zbus::block_on(async {
-        let bus = Connection::session().await.map_err(|_| Problem::NoBus)?;
+        // A service that takes the call and never answers would hold this
+        // thread for good; this is how long QtDBus waited for the C++ Grove.
+        let bus = zbus::connection::Builder::session()
+            .method_timeout(ANSWER_WAIT)
+            .build()
+            .await
+            .map_err(|_| Problem::NoBus)?;
         let actions: [&str; 0] = [];
         let hints = HashMap::from([("desktop-entry", Variant::from("grove"))]);
         // No timeout of our own: the desktop decides how long it shows.
@@ -99,7 +108,7 @@ mod tests {
     /// `send` itself reports `Problem::NoBus`. CI runs them under a session
     /// bus of its own, and fails without one: a skipped test checks nothing.
     fn bus_missing() -> bool {
-        let missing = zbus::block_on(Connection::session()).is_err();
+        let missing = zbus::block_on(zbus::Connection::session()).is_err();
         assert!(
             !(missing && std::env::var_os("CI").is_some()),
             "CI must run the tests under a session bus"

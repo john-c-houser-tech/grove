@@ -7,6 +7,13 @@ updates:
     target-branch: dev
     schedule:
       interval: weekly
+    # cxx and cxx-gen must move together, since one generates the C++ the
+    # other's runtime is linked with; cxx-qt's crates likewise.
+    groups:
+      cxx:
+        patterns: ["cxx", "cxx-*", "cxxbridge-*"]
+      cxx-qt:
+        patterns: ["cxx-qt", "cxx-qt-*", "qt-build-utils"]
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev

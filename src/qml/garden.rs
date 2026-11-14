@@ -201,7 +201,13 @@ impl qobject::Garden {
 
 /// When a plant's session ended, as QML takes dates.
 fn when(plant: &Plant) -> Option<QDateTime> {
-    let local = Local.from_local_datetime(&plant.when).earliest()?;
+    // A time the clocks skipped when they went forward is shown as the hour
+    // after, which is what the clock read a moment later.
+    let local = Local.from_local_datetime(&plant.when).earliest().or_else(|| {
+        Local
+            .from_local_datetime(&(plant.when + chrono::TimeDelta::hours(1)))
+            .earliest()
+    })?;
     QDateTime::try_from(local).ok()
 }
 

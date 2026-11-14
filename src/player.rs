@@ -45,7 +45,7 @@ pub enum Report {
 pub trait Output {
     /// Starts playing mono samples at `synth::SAMPLE_RATE`, at a volume
     /// from 0 to 1, in place of anything playing.
-    fn start(&mut self, samples: &[f32], volume: f32) -> Result<(), Problem>;
+    fn start(&mut self, samples: Vec<f32>, volume: f32) -> Result<(), Problem>;
     /// The volume of what is playing.
     fn volume(&self) -> f32;
     fn set_volume(&mut self, volume: f32);
@@ -65,20 +65,21 @@ pub struct Speakers {
 }
 
 impl Output for Speakers {
-    fn start(&mut self, samples: &[f32], volume: f32) -> Result<(), Problem> {
+    fn start(&mut self, samples: Vec<f32>, volume: f32) -> Result<(), Problem> {
         self.stop();
         let broken = Arc::new(AtomicBool::new(false));
         let on_error = Arc::clone(&broken);
         let mut sink = DeviceSinkBuilder::from_default_device()
             .and_then(|builder| {
                 builder
-                    .with_error_callback(move |_| on_error.store(true, Ordering::SeqCst))
+                    .with_error_callback(move |error: rodio::CpalError| {
+                        if ends_the_stream(error.kind()) {
+                            on_error.store(true, Ordering::SeqCst);
+                        }
+                    })
                     .open_sink_or_fallback()
             })
-            .map_err(|error| match error {
-                DeviceSinkError::NoDevice => Problem::NoOutput,
-                _ => Problem::Unusable,
-            })?;
+            .map_err(|error| problem_opening(&error))?;
         // Letting the output go is how a sound ends here; nothing to log.
         sink.log_on_drop(false);
         let player = rodio::Player::connect_new(sink.mixer());
@@ -116,6 +117,73 @@ impl Output for Speakers {
     }
 }
 
+/// Whether an error from the audio stream means it has stopped for good.
+/// An underrun is a glitch the stream recovers from by itself, and a change
+/// of route (headphones plugged in) carries the stream along: neither is a
+/// reason to cut the sound short and say the output cannot be used.
+fn ends_the_stream(kind: rodio::CpalErrorKind) -> bool {
+    use rodio::CpalErrorKind as Kind;
+    !matches!(kind, Kind::Xrun | Kind::DeviceChanged | Kind::RealtimeDenied)
+}
+
+/// Why an output could not be opened, as the window says it. On Linux the
+/// sound system always offers a default device, so "no output" shows as a
+/// device or a sound server that is not there when it is opened.
+fn problem_opening(error: &DeviceSinkError) -> Problem {
+    use rodio::CpalErrorKind as Kind;
+    let absent = |error: &rodio::CpalError| matches!(error.kind(), Kind::DeviceNotAvailable | Kind::HostUnavailable);
+    match error {
+        DeviceSinkError::NoDevice => Problem::NoOutput,
+        DeviceSinkError::DefaultSinkConfigError(error)
+        | DeviceSinkError::BuildError(error)
+        | DeviceSinkError::SupportedConfigsError(error)
+            if absent(error) =>
+        {
+            Problem::NoOutput
+        }
+        _ => Problem::Unusable,
+    }
+}
+
+/// An output that plays nothing, for as long as the sound would last. With
+/// it, everything around a sound (its picture, its fade, the window's word on
+/// it) happens as it would, unheard, and no audio device is opened: the scene
+/// tests use it.
+#[derive(Default)]
+pub struct Silence {
+    until: Option<std::time::Instant>,
+    volume: f32,
+}
+
+impl Output for Silence {
+    fn start(&mut self, samples: Vec<f32>, volume: f32) -> Result<(), Problem> {
+        let seconds = samples.len() as f64 / f64::from(synth::SAMPLE_RATE);
+        self.until = Some(std::time::Instant::now() + Duration::from_secs_f64(seconds));
+        self.volume = volume;
+        Ok(())
+    }
+
+    fn volume(&self) -> f32 {
+        self.volume
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        self.volume = volume;
+    }
+
+    fn playing(&self) -> bool {
+        self.until.is_some_and(|until| std::time::Instant::now() < until)
+    }
+
+    fn broken(&self) -> bool {
+        false
+    }
+
+    fn stop(&mut self) {
+        self.until = None;
+    }
+}
+
 /// What the player's thread is asked to do.
 enum Command {
     /// Make a sound ahead of time.
@@ -126,6 +194,8 @@ enum Command {
     FadeOut,
     /// Stop what is playing at once.
     Stop,
+    /// Let the output go and end the thread.
+    Quit,
 }
 
 /// How often a playing sound is looked at, to fade it or to see it end.
@@ -133,9 +203,15 @@ const TICK: Duration = Duration::from_millis(30);
 /// A fade takes this many ticks: a second and a half.
 const FADE_TICKS: f32 = 50.0;
 
+/// How long a player that is dropped waits for its thread to let the output
+/// go: a stream still closing while the process exits could crash the exit.
+const QUIT_WAIT: Duration = Duration::from_secs(2);
+
 /// A handle on the player's thread, which ends when the handle is dropped.
 pub struct Player {
     commands: Sender<Command>,
+    /// Hangs up when the thread has ended.
+    ended: Receiver<()>,
     /// Counts sessions, so a sound still waiting to be made when its session
     /// ends is not played in the next.
     session: Arc<AtomicU64>,
@@ -159,9 +235,15 @@ impl Player {
         let session = Arc::new(AtomicU64::new(0));
         let muted = Arc::new(AtomicBool::new(false));
         let (current, silenced) = (Arc::clone(&session), Arc::clone(&muted));
-        std::thread::spawn(move || run(output(), &received, &current, &silenced, &report));
+        let (ending, ended) = mpsc::channel::<()>();
+        std::thread::spawn(move || {
+            run(output(), &received, &current, &silenced, &report);
+            // Only now, with the output let go.
+            drop(ending);
+        });
         Self {
             commands,
+            ended,
             session,
             muted,
         }
@@ -198,6 +280,13 @@ impl Player {
     }
 }
 
+impl Drop for Player {
+    fn drop(&mut self) {
+        let _ = self.commands.send(Command::Quit);
+        let _ = self.ended.recv_timeout(QUIT_WAIT);
+    }
+}
+
 /// The player's thread: makes the sounds, and plays them one at a time.
 fn run<O: Output>(
     mut output: O,
@@ -206,18 +295,20 @@ fn run<O: Output>(
     muted: &AtomicBool,
     report: &dyn Fn(Report),
 ) {
-    let mut phrases: HashMap<u8, Vec<f32>> = HashMap::new();
+    // Each phrase is made once and kept as it was made, sixteen bits a
+    // sample; the samples the output takes are made from it for each play,
+    // and go when the sound does.
+    let mut phrases: HashMap<u8, Vec<i16>> = HashMap::new();
     let mut phrase = |kind: Kind| -> Vec<f32> {
         phrases
             .entry(kind as u8)
-            .or_insert_with(|| {
-                let pcm = match kind {
-                    Kind::Train => synth::train(synth::SAMPLE_RATE),
-                    Kind::Plane => synth::plane(synth::SAMPLE_RATE),
-                };
-                pcm.into_iter().map(|sample| f32::from(sample) / 32768.0).collect()
+            .or_insert_with(|| match kind {
+                Kind::Train => synth::train(synth::SAMPLE_RATE),
+                Kind::Plane => synth::plane(synth::SAMPLE_RATE),
             })
-            .clone()
+            .iter()
+            .map(|sample| f32::from(*sample) / 32768.0)
+            .collect()
     };
     // How much quieter each tick makes a sound that is fading out.
     let mut fade_step: Option<f32> = None;
@@ -240,7 +331,7 @@ fn run<O: Output>(
         };
         match command {
             Some(Command::Prepare(kind)) => {
-                phrase(kind);
+                let _ = phrase(kind);
             }
             Some(Command::Play(kind, volume, of_session)) => {
                 if output.playing() || of_session != session.load(Ordering::SeqCst) {
@@ -256,7 +347,7 @@ fn run<O: Output>(
                     continue;
                 }
                 fade_step = None;
-                match output.start(&samples, volume) {
+                match output.start(samples, volume) {
                     Ok(()) => report(Report::Started(kind)),
                     Err(problem) => report(Report::Failed(kind, problem)),
                 }
@@ -267,6 +358,7 @@ fn run<O: Output>(
                 }
             }
             Some(Command::Stop) => output.stop(),
+            Some(Command::Quit) => break,
             None => {
                 if output.broken() {
                     output.stop();
@@ -306,7 +398,7 @@ mod tests {
     struct Stand(Arc<Mutex<Heard>>);
 
     impl Output for Stand {
-        fn start(&mut self, samples: &[f32], volume: f32) -> Result<(), Problem> {
+        fn start(&mut self, samples: Vec<f32>, volume: f32) -> Result<(), Problem> {
             let mut heard = self.0.lock().unwrap();
             if let Some(problem) = heard.fails {
                 return Err(problem);
@@ -354,6 +446,49 @@ mod tests {
             assert!(Instant::now() < deadline, "{what}");
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+
+    #[test]
+    fn a_glitch_or_a_change_of_route_does_not_cut_the_sound() {
+        use rodio::CpalErrorKind as Kind;
+        assert!(!ends_the_stream(Kind::Xrun));
+        assert!(!ends_the_stream(Kind::DeviceChanged));
+        assert!(!ends_the_stream(Kind::RealtimeDenied));
+        assert!(ends_the_stream(Kind::DeviceNotAvailable));
+        assert!(ends_the_stream(Kind::StreamInvalidated));
+    }
+
+    #[test]
+    fn a_device_that_is_not_there_is_no_output() {
+        use rodio::{CpalError, CpalErrorKind as Kind};
+        let opening = |kind| problem_opening(&DeviceSinkError::BuildError(CpalError::from(kind)));
+        assert_eq!(opening(Kind::DeviceNotAvailable), Problem::NoOutput);
+        assert_eq!(opening(Kind::HostUnavailable), Problem::NoOutput);
+        assert_eq!(opening(Kind::PermissionDenied), Problem::Unusable);
+        assert_eq!(problem_opening(&DeviceSinkError::NoDevice), Problem::NoOutput);
+    }
+
+    #[test]
+    fn silence_lasts_as_long_as_the_sound() {
+        let mut silence = Silence::default();
+        assert!(!silence.playing());
+        silence.start(vec![0.0; synth::SAMPLE_RATE as usize / 10], 0.3).unwrap();
+        assert!(silence.playing());
+        assert_eq!(silence.volume(), 0.3);
+        std::thread::sleep(Duration::from_millis(150));
+        assert!(!silence.playing());
+    }
+
+    #[test]
+    fn a_dropped_player_waits_for_its_thread_to_end() {
+        let (player, heard, reports) = player();
+        player.play(Kind::Plane, 0.3);
+        reports.recv_timeout(SOON).unwrap();
+        let started = Instant::now();
+        drop(player);
+        // The thread let the output go before the drop returned.
+        assert!(!heard.lock().unwrap().playing);
+        assert!(started.elapsed() < QUIT_WAIT);
     }
 
     #[test]

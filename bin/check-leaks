@@ -25,6 +25,9 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+# Cargo builds into the repository's own target/, which the rest of this
+# script reads from, whatever the environment says elsewhere.
+export CARGO_TARGET_DIR="$ROOT/target"
 cd "$ROOT"
 canary=0
 [ "${1:-}" = "--canary" ] && canary=1
@@ -115,7 +118,13 @@ if [ "$canary" = 1 ]; then
         echo "canary: the soak test did NOT catch memory kept each round"
         exit 1
     fi
-    echo "canary: the soak test caught memory kept each round ($(grep -m1 -oE '[0-9]+ bytes a round' "$logs/soak.tests"))"
+    # Failing is not enough: it must have failed on the heap.
+    if ! kept="$(grep -m1 -oE 'rising [0-9]+ bytes a round' "$logs/soak.tests")"; then
+        echo "canary: the soak test failed, but not on the heap:"
+        tail -20 "$logs/soak.tests"
+        exit 1
+    fi
+    echo "canary: the soak test caught memory kept each round ($kept)"
     exit 0
 fi
 if GROVE_SOAK=1 "$scene" soak >"$logs/soak.tests" 2>&1; then

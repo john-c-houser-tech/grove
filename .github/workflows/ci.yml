@@ -41,7 +41,7 @@ jobs:
           pacman -Suu --noconfirm --needed git base-devel rust cargo-audit python mesa ttf-dejavu \
             qt6-base qt6-declarative alsa-lib dbus xorg-server-xvfb xorg-xauth
           pacman -Q qt6-base qt6-declarative rust cargo-audit mesa
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false  # nothing after this needs git access
       # The container runs as root; the checks run as a normal user, as they

@@ -16,6 +16,9 @@ ApplicationWindow {
     visible: true
     title: "Grove"
     color: "#0e1210"
+    // The language's locale, which the window's controls and popups take as
+    // theirs, as they took Qt's default when C++ set it.
+    locale: Qt.locale(Translator.locale)
 
     Material.theme: Material.Dark
     Material.accent: Theme.accent

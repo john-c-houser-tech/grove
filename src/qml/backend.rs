@@ -148,7 +148,10 @@ impl qobject::Backend {
         let now = Instant::now();
         let mut rust = self.as_mut().rust_mut();
         let passed = now.duration_since(rust.clock).as_millis() as i64;
-        rust.clock = now;
+        // The clock moves on by what was counted, so the part of a
+        // millisecond left over is counted next time, not lost: lost twenty
+        // times a second, it would make a session end seconds late.
+        rust.clock += Duration::from_millis(passed as u64);
         shared::update(|app| app.advance(passed));
         self.retire_ticker();
     }

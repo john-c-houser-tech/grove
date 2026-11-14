@@ -7,7 +7,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use chrono::{DateTime, NaiveDateTime};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime};
 use serde_json::{json, Map, Value};
 
 /// How a session ended.
@@ -281,13 +281,25 @@ fn whole(value: Option<&Value>) -> Option<i32> {
     (number.fract() == 0.0 && number.abs() <= f64::from(i32::MAX)).then_some(number as i32)
 }
 
-/// A date as it is written in the file. Older files may carry fractions of a
-/// second or a UTC offset, which Qt wrote for some dates.
+/// A date as it is written in the file, in local time. Grove writes
+/// `2026-11-06T09:30:00`; anything else Qt's ISO dates took is read too, so a
+/// garden edited by hand is not lost: fractions of a second, no seconds, a
+/// date alone (its midnight), and a UTC offset, which is turned into local
+/// time so the moment stays the same.
 fn when_from(text: &str) -> Option<NaiveDateTime> {
-    NaiveDateTime::parse_from_str(text, WHEN_FORMAT)
-        .or_else(|_| NaiveDateTime::parse_from_str(text, "%Y-%m-%dT%H:%M:%S%.f"))
-        .ok()
-        .or_else(|| DateTime::parse_from_rfc3339(text).ok().map(|when| when.naive_local()))
+    ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%dT%H:%M"]
+        .iter()
+        .find_map(|format| NaiveDateTime::parse_from_str(text, format).ok())
+        .or_else(|| {
+            NaiveDate::parse_from_str(text, "%Y-%m-%d")
+                .ok()
+                .and_then(|day| day.and_hms_opt(0, 0, 0))
+        })
+        .or_else(|| {
+            DateTime::parse_from_rfc3339(text)
+                .ok()
+                .map(|when| when.with_timezone(&Local).naive_local())
+        })
 }
 
 /// A plant from its entry in the file, or `None` if it is not one.
@@ -509,6 +521,26 @@ mod tests {
         let garden = Garden::open(&path);
         assert_eq!(garden.problem(), None);
         assert_eq!(garden.plants(), [plant(11, Outcome::Done, 1.0, 25)]);
+    }
+
+    #[test]
+    fn dates_are_read_in_every_form_qt_read_them() {
+        let at = |text| when_from(text).map(|when| when.to_string());
+        assert_eq!(at("2026-11-06T09:30:00").as_deref(), Some("2026-11-06 09:30:00"));
+        assert_eq!(
+            at("2026-11-06T09:30:00.250").as_deref(),
+            Some("2026-11-06 09:30:00.250")
+        );
+        assert_eq!(at("2026-11-06T09:30").as_deref(), Some("2026-11-06 09:30:00"));
+        assert_eq!(at("2026-11-06").as_deref(), Some("2026-11-06 00:00:00"));
+        assert_eq!(at("06/11/2026"), None);
+        // An offset keeps the moment, in whatever zone the desktop is in.
+        let utc = "2026-11-06T09:30:00Z";
+        let expected = DateTime::parse_from_rfc3339(utc)
+            .unwrap()
+            .with_timezone(&Local)
+            .naive_local();
+        assert_eq!(when_from(utc), Some(expected));
     }
 
     #[test]

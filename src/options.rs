@@ -46,6 +46,9 @@ pub struct Options {
     pub sound_volume: f64,
     /// Where muting is remembered between runs; `None` to forget it.
     pub settings_file: Option<PathBuf>,
+    /// Plays the sounds to no one: everything around them happens, and no
+    /// audio device is opened. For the scene tests.
+    pub silent: bool,
 }
 
 impl Default for Options {
@@ -66,6 +69,7 @@ impl Default for Options {
             sound_test: None,
             sound_volume: 1.0,
             settings_file: None,
+            silent: false,
         }
     }
 }

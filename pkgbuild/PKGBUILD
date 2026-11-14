@@ -6,6 +6,8 @@ arch=('x86_64' 'aarch64')
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'alsa-lib')
 makedepends=('rust' 'gcc' 'pkgconf')
+# The sounds go through ALSA; on a PipeWire desktop this carries them on.
+optdepends=('pipewire-alsa: the distant sounds on a PipeWire desktop')
 # The C++ that the bridge to Qt generates is linked by Rust's linker, which
 # cannot read the bytecode GCC leaves in place of code when makepkg asks for
 # link-time optimization.
@@ -13,9 +15,15 @@ options=('!lto')
 source=()
 sha256sums=()
 
+# Every crate is fetched before the build, which then needs no network.
+prepare() {
+  cd "$startdir/.."
+  cargo fetch --locked
+}
+
 build() {
   cd "$startdir/.."
-  ./bin/build
+  CARGO_NET_OFFLINE=true ./bin/build
 }
 
 package() {
@@ -24,4 +32,5 @@ package() {
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 "$startdir/grove.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/grove.svg"
   install -Dm644 "$startdir/grove.desktop" "$pkgdir/usr/share/applications/grove.desktop"
+  install -Dm644 "$startdir/grove-qt.hook" "$pkgdir/usr/share/libalpm/hooks/grove-qt.hook"
 }
