@@ -7,6 +7,12 @@ in a furrow of the ploughed field.
 Stay with it for 25 minutes and the plant blooms; give up and it wilts. Either
 way it stays in your garden.
 
+> [!NOTE]
+> Grove was first written in C++ and then ported to Rust. The port was done as
+> an experiment to learn about Rust, and the Rust version of the application
+> should not be taken as a finished application. What the port taught us is in
+> [the Rust port review](docs/rust-port-review.md).
+
 - **A view.** Distant peaks wear snow in winter, with rolling ridges and a
   hillside nearer in, each hazier with distance and lit like the rest.
 - **Light follows the clock.** Dawn, noon, golden hour and night, with dusk
@@ -53,7 +59,9 @@ On Arch or Omarchy: `bin/install` builds the package and installs it, and
 Grove then appears in the launcher (Super + Space). To just run it:
 `bin/build && build/grove`.
 
-It needs `qt6-base`, `qt6-declarative`, `qt6-multimedia` and `qt6-wayland`.
+It needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `alsa-lib` to run,
+and Rust (`cargo`), a C++ compiler and `pkgconf` to build: Grove is written in Rust, and
+the bridge to Qt compiles C++ of its own.
 
 ## Languages
 
@@ -82,16 +90,23 @@ window, and does not save over it.
 
 ## Development
 
-`bin/test` runs the unit tests and the scene tests, which drive the whole app
-offscreen. `bin/lint` runs the static checks (formatting, compiler warnings,
-clang-tidy, qmllint, the translation catalogs) and `bin/check-leaks` the
-memory checks (AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer,
-Valgrind if it is installed, and a soak test); `bin/check` runs everything. `CODING_STANDARDS.md` says how
-the code is written and checked, and `githooks/` holds a pre-commit hook
-(`git config core.hooksPath githooks`). CI runs `bin/lint` and `bin/test` on
-every pull request; `bin/check-leaks` is run by hand.
+Grove is Rust, with its window in QML; `cxx-qt` joins the two. `bin/test`
+runs the unit tests and the scene tests, which drive the whole app offscreen.
+`bin/lint` runs the static checks (formatting, compiler and clippy warnings,
+qmllint, the translation catalogs, and `cargo audit` where it is installed)
+and `bin/check-leaks` the memory checks (the Qt-facing tests and the scene
+tests under Valgrind, and a soak test); `bin/check` runs everything.
+`CODING_STANDARDS.md` says how the code is written and checked, and
+`githooks/` holds a pre-commit hook (`git config core.hooksPath githooks`).
+CI runs `bin/lint` and `bin/test` on every pull request; `bin/check-leaks` is
+run by hand.
 
 ## License
 
-MIT. The build layout and theme and language watching follow Omacut and
-Monologue by David Heinemeier Hansson, also MIT.
+MIT. The theme and language watching follow Omacut and Monologue by David
+Heinemeier Hansson, also MIT.
+
+Grove is built against the Qt on the machine it is built on, and uses Qt's
+compiled QML, which reaches into Qt's internals. After an upgrade of Qt,
+rebuild it with `bin/install`; the package installs a pacman hook that says
+so when Qt is upgraded.

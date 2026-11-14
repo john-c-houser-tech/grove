@@ -25,12 +25,10 @@ Rectangle {
     }
     // Dates and numbers take the language's format, and re-render on a switch.
     function dateText(when) {
-        var lang = Translator.language
-        return when.toLocaleDateString(Qt.locale(), Locale.ShortFormat)
+        return when.toLocaleDateString(Qt.locale(Translator.locale), Locale.ShortFormat)
     }
     function number(n) {
-        var lang = Translator.language
-        return n.toLocaleString(Qt.locale(), 'f', 0)
+        return n.toLocaleString(Qt.locale(Translator.locale), 'f', 0)
     }
 
     MouseArea { anchors.fill: parent }

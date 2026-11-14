@@ -1,0 +1,13 @@
+# Grove uses Qt's compiled QML, which reaches into Qt's internals, so a Grove
+# built against one Qt may not start under another. This says so when Qt is
+# upgraded; it changes nothing.
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = qt6-declarative
+Target = qt6-base
+
+[Action]
+Description = Checking whether Grove needs rebuilding for the new Qt...
+When = PostTransaction
+Exec = /usr/bin/echo "Qt was upgraded: rebuild Grove (bin/install in its source folder) before running it."

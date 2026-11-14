@@ -1,137 +1,137 @@
 #!/bin/sh
-# The memory gate, in three parts:
+# The memory gate, in two parts:
 #
-# 1. Both test programs built with AddressSanitizer, LeakSanitizer and
-#    UndefinedBehaviorSanitizer and run (the unit tests, and the whole app
-#    driven offscreen by the scene tests). Any leak, memory error or undefined
-#    behaviour fails. No leak is suppressed.
-# 2. The same programs, unmodified, under Valgrind, when it is installed: a
-#    second checker that watches the real build rather than an instrumented
-#    one. Any definite or indirect leak or memory error fails. The scene tests
-#    draw with Qt's software renderer here, because under Valgrind the GPU
-#    driver is slow and reports noise of its own; Grove's code runs the same.
-#    tests/valgrind.supp holds the one report of Qt's that is wrong.
-# 3. The soak test on a normal build: memory that stays referenced but is never
-#    let go escapes both checkers, so the heap is read after each of forty
+# 1. The tests, unmodified, under Valgrind: the unit tests of everything
+#    that touches Qt (src/qml/, where the unsafe code that touches Qt is),
+#    and the whole app
+#    driven offscreen by the scene tests. Any definite or indirect leak or
+#    memory error fails. The scene tests draw with Qt's software renderer
+#    here, because under Valgrind the GPU driver is slow and reports noise of
+#    its own; Grove's code runs the same. tests/valgrind.supp holds the one
+#    report of Qt's that is wrong. The rest of the unit tests are safe Rust,
+#    which the compiler has already checked for what Valgrind looks for, and
+#    several of them time things, which Valgrind slows past their limits.
+# 2. The soak test on a normal build: memory that stays referenced but is
+#    never let go escapes Valgrind, so the heap is read after each of forty
 #    rounds of each part of a day, and must not keep rising.
+#
+# The C++ Grove also ran its tests under the compilers' sanitizers. Rust has
+# those only in its nightly toolchain, so they are not part of this gate.
 #
 #   bin/check-leaks           the check
 #   bin/check-leaks --canary  proves the check works: plants a leak in a unit
 #                             test, and keeps memory in the soak test, and
-#                             passes only if every part catches them
+#                             passes only if both parts catch them
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+# Cargo builds into the repository's own target/, which the rest of this
+# script reads from, whatever the environment says elsewhere.
+export CARGO_TARGET_DIR="$ROOT/target"
+cd "$ROOT"
 canary=0
 [ "${1:-}" = "--canary" ] && canary=1
-# In a canary run only the unit test with the planted leak runs.
-suites="grove_tests scene_tests"
-[ "$canary" = 1 ] && suites=grove_tests
 
-export QT_QPA_PLATFORM=offscreen
-export QT_QUICK_BACKEND=rhi
-export QSG_RHI_BACKEND=opengl
+if ! command -v valgrind >/dev/null; then
+    echo "valgrind: not installed, and the memory gate needs it (sudo pacman -S valgrind)"
+    exit 1
+fi
+
 # The desktop's own Qt plugins (the GTK theme, the input method) hold font
 # caches for the life of the process. They are not part of Grove and would
 # bury its results, so they are not loaded.
 unset QT_QPA_PLATFORMTHEME QT_IM_MODULE QT_STYLE_OVERRIDE
-export ASAN_OPTIONS=detect_leaks=1:detect_stack_use_after_return=1:strict_string_checks=1
-export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+export QT_QPA_PLATFORM=offscreen
 
-# Runs a test program, the planted leak alone in a canary run.
-run() {
-    if [ "$canary" = 1 ]; then
-        GROVE_LEAK_CANARY=1 "$@" leakCanary
-    else
-        "$@"
+# The test program cargo builds for a target, by the line cargo names it on.
+logs="$ROOT/target/check-leaks"
+mkdir -p "$logs"
+program() {
+    if ! cargo test --locked --no-run "$@" >"$logs/build.log" 2>&1; then
+        cat "$logs/build.log" >&2
+        return 1
     fi
+    sed -n 's/.*Executable .*(\(.*\))$/\1/p' "$logs/build.log" | tail -1
+}
+unit="$(program --lib)" || { echo "the unit tests were not built"; exit 1; }
+scene="$(program --test scene)" || { echo "the scene tests were not built"; exit 1; }
+[ -x "$unit" ] && [ -x "$scene" ] || { echo "the test programs were not found"; exit 1; }
+
+# A run that ran no tests has checked nothing, whatever it exits with.
+ran() {
+    grep -qE "$1" "$2" || { echo "$3: no tests ran, so nothing was checked"; exit 1; }
 }
 
-# Reports whether a canary run caught the leak, by the log it left.
-caught() {
-    if grep -q "leakCanary" "$2"; then
-        echo "canary: $1 caught the planted leak, in leakCanary"
-    else
-        echo "canary: $1 did NOT catch the planted leak"
+# Runs a test program under Valgrind. $1 names the run; the rest is the
+# program and its arguments.
+memcheck() {
+    name="$1"
+    shift
+    valgrind --suppressions="$ROOT/tests/valgrind.supp" \
+        --leak-check=full --show-leak-kinds=definite,indirect --errors-for-leak-kinds=definite,indirect \
+        --num-callers=30 --error-exitcode=1 --log-file="$logs/$name.valgrind" "$@" >"$logs/$name.tests" 2>&1
+}
+
+# What Valgrind found in a run, if anything.
+findings() {
+    grep -E -B2 -A20 "are definitely lost|are indirectly lost|Invalid|uninitialised|Mismatched" "$logs/$1.valgrind" | head -60
+    grep -E "ERROR SUMMARY" "$logs/$1.valgrind" || true
+}
+
+# 1. Valgrind.
+if [ "$canary" = 1 ]; then
+    if GROVE_LEAK_CANARY=1 memcheck canary "$unit" --test-threads=1 leak_canary; then
+        echo "canary: Valgrind did NOT catch the planted leak"
         exit 1
     fi
-}
-
-# 1. The sanitizers.
-failed=0
-for suite in $suites; do
-    build="$ROOT/build/asan-$suite"
-    mkdir -p "$build"
-    cd "$build"
-    qmake6 "$ROOT/tests/$suite.pro" "CONFIG+=debug sanitizer sanitize_address sanitize_undefined" "CONFIG-=release" >/dev/null
-    make -j"$(nproc)" >/dev/null
-    log="$build/check.log"
-    run ./"$suite" >"$log" 2>&1 || failed=1
-    # The sanitizers' exit status does not survive QTest's, so the report decides.
-    if grep -qE "ERROR: (AddressSanitizer|LeakSanitizer)|runtime error:" "$log"; then
-        failed=1
-        [ "$canary" = 1 ] && caught "the sanitizers" "$log" && continue
-        grep -E -A14 "ERROR: (AddressSanitizer|LeakSanitizer)|runtime error:" "$log" | head -40
-        grep -E "^SUMMARY:" "$log" || true
-    elif [ "$canary" = 1 ]; then
-        caught "the sanitizers" /dev/null
+    if grep -q "leak_canary" "$logs/canary.valgrind"; then
+        echo "canary: Valgrind caught the planted leak, in leak_canary"
+    else
+        echo "canary: Valgrind failed, but not on the planted leak:"
+        findings canary
+        exit 1
     fi
-    echo "sanitizers, $suite: $(grep -E '^Totals:' "$log" || echo 'did not finish')"
-done
-[ "$canary" = 0 ] && [ "$failed" = 0 ] && echo "sanitizers: no leaks, memory errors or undefined behaviour"
-
-# 2. Valgrind.
-if command -v valgrind >/dev/null; then
-    vfailed=0
-    for suite in $suites; do
-        build="$ROOT/build/valgrind-$suite"
-        mkdir -p "$build"
-        cd "$build"
-        qmake6 "$ROOT/tests/$suite.pro" "CONFIG+=force_debug_info" >/dev/null
-        make -j"$(nproc)" >/dev/null
-        log="$build/valgrind.log"
-        # Through env: an assignment before a shell function can outlive the call.
-        run env QT_QUICK_BACKEND=software valgrind --suppressions="$ROOT/tests/valgrind.supp" \
-            --leak-check=full --show-leak-kinds=definite,indirect --errors-for-leak-kinds=definite,indirect \
-            --num-callers=30 --error-exitcode=1 --log-file="$log" ./"$suite" >"$build/tests.log" 2>&1 || vfailed=1
-        if ! grep -q "ERROR SUMMARY: 0 errors" "$log"; then
-            vfailed=1
-            [ "$canary" = 1 ] && caught "Valgrind" "$log" && continue
-            grep -E -B2 -A20 "are definitely lost|are indirectly lost|Invalid|uninitialised|Mismatched" "$log" | head -60
-            grep -E "ERROR SUMMARY" "$log"
-        elif [ "$canary" = 1 ]; then
-            caught "Valgrind" /dev/null
-        fi
-        echo "valgrind, $suite: $(grep -E '^Totals:' "$build/tests.log" || echo 'did not finish')"
-    done
-    [ "$vfailed" = 1 ] && failed=1
-    [ "$canary" = 0 ] && [ "$vfailed" = 0 ] && echo "valgrind: no leaks or memory errors"
-elif [ "$canary" = 1 ]; then
-    # A canary run proves every part, so a part that cannot run fails it.
-    echo "canary: Valgrind is not installed, so its part cannot be proved (sudo pacman -S valgrind)"
-    exit 1
 else
-    echo "valgrind: not installed, so skipped (sudo pacman -S valgrind)"
+    failed=0
+    if memcheck unit "$unit" --test-threads=1 qml::; then
+        ran '^test result: ok\. [1-9]' "$logs/unit.tests" "valgrind, unit tests of src/qml"
+        echo "valgrind, unit tests of src/qml: $(grep -E '^test result' "$logs/unit.tests")"
+    else
+        failed=1
+        findings unit
+        grep -E "^test result|FAILED|panicked" "$logs/unit.tests" || echo "valgrind, unit tests: did not finish"
+    fi
+    if QT_QUICK_BACKEND=software memcheck scene "$scene"; then
+        ran '^scene tests: [1-9]' "$logs/scene.tests" "valgrind, scene tests"
+        echo "valgrind, $(grep -E '^scene tests' "$logs/scene.tests")"
+    else
+        failed=1
+        findings scene
+        grep -E "^scene tests|FAILED|panicked" "$logs/scene.tests" || echo "valgrind, scene tests: did not finish"
+    fi
+    [ "$failed" = 0 ] && echo "valgrind: no leaks or memory errors"
 fi
 
-# 3. The soak test.
-build="$ROOT/build/scene_tests"
-mkdir -p "$build"
-cd "$build"
-qmake6 "$ROOT/tests/scene_tests.pro" >/dev/null
-make -j"$(nproc)" >/dev/null
+# 2. The soak test.
 if [ "$canary" = 1 ]; then
-    if GROVE_SOAK=1 GROVE_LEAK_CANARY=1 ./scene_tests repeatingTheDayDoesNotGrowTheHeap:garden >"$build/soak.log" 2>&1; then
+    if GROVE_SOAK=1 GROVE_LEAK_CANARY=1 "$scene" soak_garden >"$logs/soak.tests" 2>&1; then
         echo "canary: the soak test did NOT catch memory kept each round"
         exit 1
     fi
-    echo "canary: the soak test caught memory kept each round ($(grep -m1 -oE '[0-9]+ bytes a round' "$build/soak.log"))"
+    # Failing is not enough: it must have failed on the heap.
+    if ! kept="$(grep -m1 -oE 'rising [0-9]+ bytes a round' "$logs/soak.tests")"; then
+        echo "canary: the soak test failed, but not on the heap:"
+        tail -20 "$logs/soak.tests"
+        exit 1
+    fi
+    echo "canary: the soak test caught memory kept each round ($kept)"
     exit 0
 fi
-if GROVE_SOAK=1 ./scene_tests repeatingTheDayDoesNotGrowTheHeap >"$build/soak.log" 2>&1; then
-    grep -E "heap grew" "$build/soak.log" | sed 's/.*) /soak: /'
+if GROVE_SOAK=1 "$scene" soak >"$logs/soak.tests" 2>&1; then
+    ran '^scene tests: 3 passed' "$logs/soak.tests" "soak"
+    grep -E "heap grew" "$logs/soak.tests" | sed 's/^/soak: /'
 else
     failed=1
-    grep -E "heap grew|FAIL|Loc:" "$build/soak.log"
+    grep -E "heap grew|FAILED|panicked|rising" "$logs/soak.tests"
 fi
 exit "$failed"

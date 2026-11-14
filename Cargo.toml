@@ -1,0 +1,36 @@
+[package]
+name = "grove"
+version = "0.10.0"
+edition = "2021"
+license = "MIT"
+description = "A focus timer that grows a plant while you work"
+publish = false
+
+[dependencies]
+cxx = "1.0.176"
+cxx-qt = "0.10"
+cxx-qt-lib = { version = "0.10", features = ["qt_full", "chrono"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+fastrand = "2"
+serde_json = "1"
+notify = "8.2.2"
+zbus = { version = "6.3.0", default-features = false, features = ["default-rt"] }
+rodio = { version = "0.23.0", default-features = false, features = ["playback"] }
+libc = "0.2.191"
+
+[build-dependencies]
+cxx-qt-build = "0.10"
+
+[dev-dependencies]
+libc = "0.2"
+tempfile = "3"
+zbus = { version = "6.3.0", default-features = false, features = ["default-rt", "service"] }
+
+[profile.release]
+# Enough to name the functions in a crash; makepkg moves it to the debug
+# package.
+debug = "line-tables-only"
+
+[[test]]
+name = "scene"
+harness = false
