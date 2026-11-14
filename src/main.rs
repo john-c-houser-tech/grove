@@ -7,6 +7,7 @@ mod follow;
 mod garden;
 mod language;
 mod light;
+mod notifier;
 mod options;
 mod qml;
 mod session;

@@ -14,9 +14,11 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 fastrand = "2"
 serde_json = "1"
 notify = "8.2.2"
+zbus = { version = "6.3.0", default-features = false, features = ["default-rt"] }
 
 [build-dependencies]
 cxx-qt-build = "0.10"
 
 [dev-dependencies]
 tempfile = "3"
+zbus = { version = "6.3.0", default-features = false, features = ["default-rt", "service"] }

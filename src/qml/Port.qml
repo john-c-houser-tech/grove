@@ -8,7 +8,7 @@ QtObject {
     id: port
 
     property int growthSteps: 0
-    property Timer leave: Timer { interval: 100; onTriggered: Qt.quit() }
+    property Timer leave: Timer { interval: 400; onTriggered: Qt.quit() }
 
     property Connections session: Connections {
         target: Backend
@@ -45,6 +45,10 @@ QtObject {
         function onProblemChanged() { console.log("garden problem:", Garden.problem) }
     }
 
+    property Connections notifier: Connections {
+        target: Notifier
+        function onProblemChanged() { console.log("notifier problem:", Notifier.problem) }
+    }
     property Connections theme: Connections {
         target: Theme
         function onChanged() { console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius) }
@@ -59,6 +63,7 @@ QtObject {
 
     Component.onCompleted: {
         console.log("language", Translator.language, "rtl", Translator.rightToLeft, port.said)
+        console.log("notifier problem:", Notifier.problem)
         console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius)
         console.log("garden", Garden.grown, "grown", Garden.wilted, "wilted", "problem:", Garden.problem)
         console.log("state", Backend.state, "seconds", Backend.seconds, "remaining", Backend.remaining)

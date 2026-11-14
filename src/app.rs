@@ -9,6 +9,7 @@ use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, Timelike};
 use crate::garden::{self, Garden, Outcome, Plant};
 use crate::language::{self, Catalog};
 use crate::light::{Moment, Sky};
+use crate::notifier;
 use crate::options::Options;
 use crate::session::{Session, State, SEED_LIMIT};
 use crate::theme::Theme;
@@ -31,6 +32,10 @@ pub enum Event {
     Theme,
     /// The language changed, so everything said is said again.
     Language,
+    /// A plant grew to the end, which the desktop should be told.
+    PlantGrown,
+    /// Whether notifications work changed.
+    NotifierProblem,
     /// The garden's plants changed, in the way given.
     Garden(garden::Change),
     /// The garden's problem changed.
@@ -49,6 +54,10 @@ pub struct App {
     garden: Garden,
     /// The current language's strings, shared with whoever translates.
     catalog: Arc<Catalog>,
+    /// The id of the last notification sent, which the next replaces, and
+    /// why notifications cannot be sent, if they cannot.
+    last_notification: u32,
+    notifier_problem: Option<notifier::Problem>,
 }
 
 impl App {
@@ -81,6 +90,8 @@ impl App {
             fixed,
             garden,
             catalog,
+            last_notification: 0,
+            notifier_problem: None,
             options,
         };
         // The idle window has weather too, until the first session rolls its own.
@@ -131,6 +142,29 @@ impl App {
         }
         self.catalog = Arc::new(Catalog::load(&code, &self.options.catalogs));
         vec![Event::Language]
+    }
+
+    /// The id of the last notification sent, or 0, for the next to replace.
+    pub fn last_notification(&self) -> u32 {
+        self.last_notification
+    }
+
+    /// `None` when notifications work, otherwise why they cannot.
+    pub fn notifier_problem(&self) -> Option<notifier::Problem> {
+        self.notifier_problem
+    }
+
+    /// Takes the outcome of sending a notification: its id, or the problem.
+    pub fn notified(&mut self, outcome: Result<u32, notifier::Problem>) -> Vec<Event> {
+        let problem = outcome.err();
+        if let Ok(id) = outcome {
+            self.last_notification = id;
+        }
+        if problem == self.notifier_problem {
+            return Vec::new();
+        }
+        self.notifier_problem = problem;
+        vec![Event::NotifierProblem]
     }
 
     /// Starts a session growing the plant of `seed`, unless one is growing.
@@ -220,6 +254,10 @@ impl App {
         if self.session.seconds() != 25 * 60 && self.options.garden_path.is_none() {
             return;
         }
+        // The same goes for telling the desktop.
+        if outcome == Outcome::Done {
+            events.push(Event::PlantGrown);
+        }
         let problem = self.garden.problem().cloned();
         let change = self.garden.record(Plant {
             seed: self.session.seed(),
@@ -282,6 +320,7 @@ mod tests {
             language_file: None,
             catalogs: crate::language::Catalogs::BuiltIn,
             omarchy_path: None,
+            notification_service: "org.grove.NoSuchService".into(),
         }
     }
 
@@ -363,6 +402,23 @@ mod tests {
     }
 
     #[test]
+    fn a_notification_problem_is_told_when_it_comes_and_goes() {
+        let mut app = app(10);
+        assert_eq!(
+            app.notified(Err(notifier::Problem::NoService)),
+            vec![Event::NotifierProblem]
+        );
+        assert_eq!(app.notified(Err(notifier::Problem::NoService)), vec![]);
+        assert_eq!(app.notifier_problem(), Some(notifier::Problem::NoService));
+        assert_eq!(app.notified(Ok(41)), vec![Event::NotifierProblem]);
+        assert_eq!(app.notifier_problem(), None);
+        // The next notification replaces this one.
+        assert_eq!(app.last_notification(), 41);
+        assert_eq!(app.notified(Ok(42)), vec![]);
+        assert_eq!(app.last_notification(), 42);
+    }
+
+    #[test]
     fn a_date_alone_fixes_the_season() {
         let app = App::with_garden(
             Options {
@@ -406,6 +462,7 @@ mod tests {
         app.start(7);
         let events = app.advance(120_000);
         assert!(events.contains(&Event::Garden(garden::Change::Reset)));
+        assert!(events.contains(&Event::PlantGrown));
         assert!(!events.contains(&Event::GardenProblem));
         let plant = &app.garden().plants()[0];
         assert_eq!((plant.seed, plant.outcome, plant.minutes), (7, Outcome::Done, 2));
@@ -422,7 +479,8 @@ mod tests {
         let mut app = App::new(keeping(120, &dir));
         app.start(7);
         app.advance(30_000);
-        app.give_up();
+        // A wilted plant is nothing to tell the desktop about.
+        assert!(!app.give_up().contains(&Event::PlantGrown));
         let plant = &app.garden().plants()[0];
         assert_eq!((plant.outcome, plant.minutes), (Outcome::Wilted, 0));
         assert!(plant.progress > 0.25 && plant.progress < 0.4);
@@ -434,7 +492,9 @@ mod tests {
         let mut app = app(10);
         app.start(7);
         let events = app.advance(10_000);
-        assert!(!events.iter().any(|event| matches!(event, Event::Garden(_))));
+        assert!(!events
+            .iter()
+            .any(|event| matches!(event, Event::Garden(_) | Event::PlantGrown)));
     }
 
     #[test]

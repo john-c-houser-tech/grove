@@ -9,6 +9,7 @@ use chrono::{NaiveDate, NaiveTime};
 
 use crate::follow::Hyprland;
 use crate::language::Catalogs;
+use crate::notifier;
 use crate::weather::Kind;
 
 /// The settings everything is made from.
@@ -34,6 +35,8 @@ pub struct Options {
     pub catalogs: Catalogs,
     /// Where Omarchy is installed, for its registry of locales.
     pub omarchy_path: Option<PathBuf>,
+    /// The desktop notification service; only tests name another.
+    pub notification_service: String,
 }
 
 impl Default for Options {
@@ -49,6 +52,7 @@ impl Default for Options {
             language_file: None,
             catalogs: Catalogs::BuiltIn,
             omarchy_path: None,
+            notification_service: notifier::SERVICE.to_string(),
         }
     }
 }

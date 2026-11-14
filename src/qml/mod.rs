@@ -5,6 +5,7 @@ pub mod backend;
 mod color;
 pub mod garden;
 pub mod light;
+pub mod notifier;
 mod shared;
 pub mod theme;
 pub mod translator;
