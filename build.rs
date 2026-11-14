@@ -16,6 +16,7 @@ fn main() {
         "src/qml/garden.rs",
         "src/qml/light.rs",
         "src/qml/notifier.rs",
+        "src/qml/paint.rs",
         "src/qml/sounds.rs",
         "src/qml/theme.rs",
         "src/qml/translator.rs",

@@ -6,6 +6,7 @@ mod color;
 pub mod garden;
 pub mod light;
 pub mod notifier;
+pub mod paint;
 mod shared;
 pub mod sounds;
 pub mod theme;
