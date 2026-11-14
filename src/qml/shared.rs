@@ -4,11 +4,11 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use crate::app::{App, Event};
 use crate::language::Catalog;
-use crate::options;
+use crate::options::Options;
 
 type Listener = Rc<dyn Fn(Event)>;
 
@@ -21,13 +21,47 @@ thread_local! {
 /// ask for a translation from wherever it likes.
 static CATALOG: RwLock<Option<Arc<Catalog>>> = RwLock::new(None);
 
-/// The app in `slot`, made from the installed options on first use.
+/// The parts of the app that do their work from inside a QML singleton:
+/// following the desktop's theme and language, sending the notification,
+/// and playing the sounds. Each starts when its singleton is made.
+pub const SERVICES: [&str; 4] = ["Notifier", "Sounds", "Theme", "Translator"];
+
+/// The services that have started since the app was.
+static STARTED: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+
+/// Notes that a service has started.
+pub fn started(service: &'static str) {
+    STARTED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push(service);
+}
+
+/// The services that have not started, which is none once a window is up.
+pub fn missing() -> Vec<&'static str> {
+    let started = STARTED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    SERVICES
+        .into_iter()
+        .filter(|service| !started.contains(service))
+        .collect()
+}
+
+/// Makes the app the singletons show, from its options, in place of any app
+/// before it. Called on the GUI thread before the window is loaded; the
+/// scene tests call it afresh for each window they open.
+pub fn start(options: Options) {
+    LISTENERS.with_borrow_mut(Vec::clear);
+    STARTED.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clear();
+    let new = App::new(options);
+    publish(&new);
+    APP.set(Some(new));
+}
+
+/// The app in `slot`. Every singleton is made by a window, and no window is
+/// loaded before `start`.
 fn app(slot: &mut Option<App>) -> &mut App {
-    slot.get_or_insert_with(|| {
-        let app = App::new(options::installed());
-        publish(&app);
-        app
-    })
+    slot.as_mut()
+        .expect("qml::start must be called before a window is loaded")
 }
 
 /// Puts the app's catalog where translations are looked up.
@@ -35,7 +69,7 @@ fn publish(app: &App) {
     *CATALOG.write().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(Arc::clone(app.catalog()));
 }
 
-/// Reads from the app, making it from the installed options on first use.
+/// Reads from the app.
 pub fn read<R>(read: impl FnOnce(&App) -> R) -> R {
     APP.with_borrow_mut(|slot| read(app(slot)))
 }

@@ -123,13 +123,20 @@ impl Garden {
         garden
     }
 
-    /// ~/.local/share/grove/garden.json, or wherever XDG_DATA_HOME says.
-    pub fn default_path(variable: impl Fn(&str) -> Option<String>) -> PathBuf {
-        let base = variable("XDG_DATA_HOME")
-            .filter(|base| !base.is_empty())
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(variable("HOME").unwrap_or_default()).join(".local/share"));
-        base.join("grove/garden.json")
+    /// A garden that is kept nowhere: its plants show, and none is saved.
+    pub fn unkept() -> Self {
+        Self {
+            path: PathBuf::new(),
+            plants: Vec::new(),
+            problem: None,
+            read_only: true,
+        }
+    }
+
+    /// Where the garden is kept under the desktop's data directory:
+    /// ~/.local/share/grove/garden.json, usually.
+    pub fn default_path(data_directory: &Path) -> PathBuf {
+        data_directory.join("grove/garden.json")
     }
 
     /// The plants, newest first.
@@ -500,12 +507,15 @@ mod tests {
 
     #[test]
     fn the_garden_is_kept_in_the_data_directory() {
-        let home = |name: &str| (name == "HOME").then(|| "/home/someone".to_string());
-        assert_eq!(
-            Garden::default_path(home),
-            PathBuf::from("/home/someone/.local/share/grove/garden.json")
-        );
-        let xdg = |name: &str| (name == "XDG_DATA_HOME").then(|| "/data".to_string());
-        assert_eq!(Garden::default_path(xdg), PathBuf::from("/data/grove/garden.json"));
+        let path = Garden::default_path(Path::new("/home/someone/.local/share"));
+        assert_eq!(path, PathBuf::from("/home/someone/.local/share/grove/garden.json"));
+    }
+
+    #[test]
+    fn a_garden_kept_nowhere_shows_its_plants_and_saves_none() {
+        let mut garden = Garden::unkept();
+        assert_eq!(garden.record(plant(5, Outcome::Done, 1.0, 25)), Change::Inserted);
+        assert_eq!(seeds(&garden), [5]);
+        assert_eq!(garden.problem(), None);
     }
 }

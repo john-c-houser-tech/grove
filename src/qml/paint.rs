@@ -3,8 +3,6 @@
 //! called as Qt wrote it. Below the declarations are the few safe types the
 //! layers draw with.
 
-#![expect(dead_code, reason = "the layers that draw with all of this are ported next")]
-
 #[cxx_qt::bridge]
 pub mod ffi {
     // The methods are named q_... so their generated symbols differ from

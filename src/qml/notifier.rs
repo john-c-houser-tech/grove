@@ -44,6 +44,7 @@ pub struct NotifierRust;
 
 impl cxx_qt::Initialize for qobject::Notifier {
     fn initialize(self: Pin<&mut Self>) {
+        shared::started("Notifier");
         let gui = self.qt_thread();
         shared::listen(move |event| {
             let _ = match event {

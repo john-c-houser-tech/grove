@@ -29,7 +29,9 @@ fn main() {
         "src/qml/light.rs",
         "src/qml/notifier.rs",
         "src/qml/paint.rs",
+        "src/qml/script.rs",
         "src/qml/sounds.rs",
+        "src/qml/testing.rs",
         "src/qml/theme.rs",
         "src/qml/translator.rs",
         "src/qml/weather.rs",
@@ -38,5 +40,7 @@ fn main() {
     // them.
     .qrc_resources(["src/images/rain.png", "src/images/snow.png"])
     .qt_module("Quick")
+    // Only for a header: the scene tests send keys the way Qt's own tests do.
+    .qt_module("Test")
     .build();
 }

@@ -117,6 +117,7 @@ pub struct TranslatorRust {
 
 impl cxx_qt::Initialize for qobject::Translator {
     fn initialize(mut self: Pin<&mut Self>) {
+        shared::started("Translator");
         let translator: Pin<&mut qobject::QTranslator> = self.as_mut().upcast_pin();
         // SAFETY: a QTranslator removes itself from the application when it
         // is destroyed, so the application never asks one that is gone.

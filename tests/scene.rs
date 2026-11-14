@@ -1,0 +1,429 @@
+//! The whole app, its real window drawn offscreen and driven by keys, as a
+//! user would: nothing appears on the desktop. `main` below keeps it
+//! offscreen however it is started, and draws with the GPU renderer, so
+//! particles and textures are drawn as they are on screen.
+//!
+//! Run by `cargo test`, or one test by name: `cargo test --test scene --
+//! frames_for_review`.
+
+use std::io::{BufRead, BufReader, Write};
+use std::os::fd::FromRawFd;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use chrono::{NaiveDate, NaiveTime};
+use cxx_qt_lib::{QGuiApplication, QQuickStyle, QString};
+use grove::garden::{Outcome, Plant};
+use grove::options::Options;
+use grove::qml::shared;
+use grove::qml::testing::{wait, wait_until, Key, Scene};
+use grove::session::State;
+use grove::weather::Kind;
+use tempfile::TempDir;
+
+/// How a test ended, when it did not fail.
+enum Ended {
+    Passed,
+    /// Not run, for the reason given.
+    Skipped(&'static str),
+}
+
+/// What each test starts from: a garden, theme and language of its own.
+struct Start {
+    dir: TempDir,
+}
+
+impl Start {
+    fn new() -> Self {
+        Self {
+            dir: TempDir::new().expect("a folder for the test"),
+        }
+    }
+
+    /// A clear noon on the first of July, with nothing of the desktop's read
+    /// or written: an empty theme folder gives the default accent, and no
+    /// language file means English.
+    fn options(&self, seconds: i32) -> Options {
+        Options {
+            seconds,
+            date: NaiveDate::from_ymd_opt(2026, 7, 1),
+            time: NaiveTime::from_hms_opt(12, 0, 0),
+            weather: Some(Kind::Clear),
+            garden_path: Some(self.dir.path().join("garden.json")),
+            theme_directory: Some(self.dir.path().join("theme")),
+            language_file: Some(self.dir.path().join("language")),
+            notification_service: "org.grove.tests.NoOneListening".into(),
+            ..Options::default()
+        }
+    }
+
+    /// The app and its window, muted, with sessions of that many seconds.
+    fn scene(&self, seconds: i32) -> Scene {
+        self.open(self.options(seconds))
+    }
+
+    fn open(&self, options: Options) -> Scene {
+        Scene::open(options, true).expect("the window was not shown")
+    }
+}
+
+fn state() -> State {
+    shared::read(|app| app.session().state())
+}
+
+/// A plant for the garden: odd seeds grew, even ones wilted.
+fn plant(seed: i32) -> Plant {
+    let grew = seed % 2 == 1;
+    Plant {
+        seed,
+        outcome: if grew { Outcome::Done } else { Outcome::Wilted },
+        season: "summer".into(),
+        weather: "clear".into(),
+        progress: if grew { 1.0 } else { 0.4 },
+        when: NaiveDate::from_ymd_opt(2026, 7, seed as u32)
+            .unwrap()
+            .and_hms_opt(9, 0, 0)
+            .unwrap(),
+        minutes: if grew { 25 } else { 0 },
+    }
+}
+
+/// Puts a plant in the garden, and lets the window hear of it: the model
+/// the garden view shows is told on the next turn of the event loop.
+fn record(plant: Plant) {
+    shared::update(|app| app.record(plant));
+    wait(20);
+}
+
+fn space_plants_a_seed(start: &Start) -> Ended {
+    let scene = start.scene(10);
+    assert_eq!(state(), State::Idle);
+    scene.press(Key::Space);
+    assert_eq!(state(), State::Growing);
+    Ended::Passed
+}
+
+fn a_session_runs_to_the_end_and_is_kept(start: &Start) -> Ended {
+    let scene = start.scene(2);
+    scene.press(Key::Space);
+    assert!(
+        wait_until(5000, || state() == State::Done),
+        "the session never finished"
+    );
+    assert_eq!(shared::read(|app| app.garden().grown()), 1);
+    Ended::Passed
+}
+
+fn giving_up_asks_first_and_wilts_the_plant(start: &Start) -> Ended {
+    let scene = start.scene(10);
+    scene.press(Key::Space);
+    scene.press(Key::Space);
+    assert!(wait_until(5000, || scene.is("confirm.opened")), "giving up did not ask");
+    // Still growing until the answer is yes.
+    assert_eq!(state(), State::Growing);
+    scene.press(Key::Return);
+    assert_eq!(state(), State::Wilted);
+    assert_eq!(shared::read(|app| app.garden().wilted()), 1);
+    Ended::Passed
+}
+
+fn the_garden_opens_takes_the_keys_and_closes(start: &Start) -> Ended {
+    let scene = start.scene(10);
+    for seed in 1..=3 {
+        record(plant(seed));
+    }
+    assert!(!scene.is("find('gardenLoader').item"));
+
+    scene.press(Key::G);
+    assert!(
+        wait_until(5000, || scene.is("find('gardenLoader').item")),
+        "the garden did not open"
+    );
+    assert!(
+        wait_until(5000, || scene.is("find('gardenGrid').activeFocus")),
+        "the garden did not take the keys"
+    );
+    assert_eq!(scene.number("find('gardenGrid').currentIndex"), 0);
+    scene.press(Key::Right);
+    assert_eq!(scene.number("find('gardenGrid').currentIndex"), 1);
+    // The tile with the keys wears the accent: the theme's fallback, with no
+    // Omarchy theme to read.
+    let border = "find('gardenGrid').currentItem.children[0].border.color";
+    assert!(
+        wait_until(5000, || scene.text(border).eq_ignore_ascii_case("#FFD60A")),
+        "{}",
+        scene.text(border)
+    );
+
+    scene.press(Key::Escape);
+    assert!(
+        wait_until(5000, || !scene.is("find('gardenLoader').item")),
+        "the garden did not close"
+    );
+    Ended::Passed
+}
+
+fn every_service_is_started_with_the_window(start: &Start) -> Ended {
+    let _scene = start.scene(10);
+    // Following the theme and the language, the notification and the sounds
+    // live in QML singletons, which the engine only makes when something
+    // names them. Rust names them all at launch, so no edit to the QML can
+    // switch one off.
+    assert_eq!(shared::missing(), Vec::<&str>::new());
+    Ended::Passed
+}
+
+fn the_landscape_is_drawn(start: &Start) -> Ended {
+    let scene = start.scene(10);
+    // The layers draw on another thread; the field brings many tones to the
+    // bottom of the window once it is there.
+    assert!(
+        wait_until(5000, || scene.grab().tones_in(0.8, 1.0) > 200),
+        "the field was not drawn"
+    );
+    // And the hills to the middle.
+    assert!(scene.grab().tones_in(0.3, 0.6) > 50, "the hills were not drawn");
+    Ended::Passed
+}
+
+/// Not a test: with GROVE_SHOTS set to a folder, saves the scene at several
+/// hours, seasons and weathers there for a person to look at.
+fn frames_for_review(start: &Start) -> Ended {
+    let Some(out) = std::env::var_os("GROVE_SHOTS").map(PathBuf::from) else {
+        return Ended::Skipped("set GROVE_SHOTS to a folder to save frames");
+    };
+    std::fs::create_dir_all(&out).expect("the folder for the frames");
+    let save = |scene: &Scene, name: &str| assert!(scene.grab().save(&out.join(format!("{name}.png"))), "{name}");
+    let scenes = [
+        ("summer-noon", (2026, 7, 1), (12, 0), Kind::Clear),
+        ("summer-dusk", (2026, 7, 1), (20, 40), Kind::Clear),
+        ("winter-noon", (2026, 1, 15), (12, 0), Kind::Clear),
+        ("night", (2026, 7, 1), (1, 0), Kind::Clear),
+        ("rain", (2026, 7, 1), (12, 0), Kind::Rain),
+        ("snow", (2026, 1, 15), (12, 0), Kind::Snow),
+        ("fog", (2026, 10, 15), (9, 0), Kind::Fog),
+    ];
+    for (name, (year, month, day), (hour, minute), weather) in scenes {
+        let scene = start.open(Options {
+            date: NaiveDate::from_ymd_opt(year, month, day),
+            time: NaiveTime::from_hms_opt(hour, minute, 0),
+            weather: Some(weather),
+            ..start.options(25 * 60)
+        });
+        wait(2500);
+        save(&scene, name);
+    }
+    // The night train, stopped at the crossing with its signal ringing.
+    {
+        let scene = start.open(Options {
+            time: NaiveTime::from_hms_opt(1, 0, 0),
+            ..start.options(25 * 60)
+        });
+        scene.evaluate("find('train').show(0.6)");
+        wait(2500);
+        save(&scene, "night-train");
+    }
+    let scene = start.scene(10);
+    for seed in 1..=6 {
+        record(plant(seed));
+    }
+    scene.press(Key::G);
+    scene.press(Key::Right);
+    wait(1000);
+    save(&scene, "garden");
+    Ended::Passed
+}
+
+/// Not a test: with GROVE_README_SHOTS set to a folder, saves the README's
+/// two pictures there. A session's plant comes from a random seed, so look
+/// before keeping one.
+fn frames_for_readme(start: &Start) -> Ended {
+    let Some(out) = std::env::var_os("GROVE_README_SHOTS").map(PathBuf::from) else {
+        return Ended::Skipped("set GROVE_README_SHOTS to a folder to save the README's pictures");
+    };
+    std::fs::create_dir_all(&out).expect("the folder for the pictures");
+    // Sound stays on but silent, so the window shows no "sounds are off".
+    let unmuted = |options: Options| {
+        Scene::open(
+            Options {
+                sound_volume: 0.0,
+                ..options
+            },
+            false,
+        )
+        .expect("the window was not shown")
+    };
+
+    // An autumn plant nearly grown on a clear morning, a minute and a half
+    // from the end of its session.
+    {
+        let scene = unmuted(Options {
+            date: NaiveDate::from_ymd_opt(2026, 10, 20),
+            time: NaiveTime::from_hms_opt(9, 45, 0),
+            ..start.options(25 * 60)
+        });
+        scene.press(Key::Space);
+        shared::update(|app| app.advance((25 * 60 - 89) * 1000));
+        wait(2500);
+        assert!(scene.grab().save(&out.join("grove.png")));
+    }
+
+    // Twelve October days in the garden, ten grown and two wilted: three
+    // full rows, nothing cut off at the bottom.
+    let scene = unmuted(start.options(10));
+    let weathers = [
+        "clear", "rain", "clear", "cloudy", "clear", "cloudy", "clear", "cloudy", "clear", "fog", "clear", "rain",
+    ];
+    for (day, weather) in (0u32..).zip(weathers) {
+        let grew = day != 3 && day != 8;
+        record(Plant {
+            seed: 101 + day as i32 * 37,
+            outcome: if grew { Outcome::Done } else { Outcome::Wilted },
+            season: "autumn".into(),
+            weather: weather.into(),
+            progress: if grew { 1.0 } else { 0.3 + 0.1 * f64::from(day % 3) },
+            when: NaiveDate::from_ymd_opt(2026, 10, 9 + day / 2 + day % 2)
+                .unwrap()
+                .and_hms_opt(9 + day % 5, 0, 0)
+                .unwrap(),
+            minutes: if grew { 25 } else { 0 },
+        });
+    }
+    scene.press(Key::G);
+    wait(1500);
+    assert!(scene.grab().save(&out.join("garden.png")));
+    Ended::Passed
+}
+
+type Test = fn(&Start) -> Ended;
+
+const TESTS: [(&str, Test); 8] = [
+    (
+        "every_service_is_started_with_the_window",
+        every_service_is_started_with_the_window,
+    ),
+    ("space_plants_a_seed", space_plants_a_seed),
+    (
+        "a_session_runs_to_the_end_and_is_kept",
+        a_session_runs_to_the_end_and_is_kept,
+    ),
+    (
+        "giving_up_asks_first_and_wilts_the_plant",
+        giving_up_asks_first_and_wilts_the_plant,
+    ),
+    (
+        "the_garden_opens_takes_the_keys_and_closes",
+        the_garden_opens_takes_the_keys_and_closes,
+    ),
+    ("the_landscape_is_drawn", the_landscape_is_drawn),
+    ("frames_for_review", frames_for_review),
+    ("frames_for_readme", frames_for_readme),
+];
+
+/// Everything written to standard error, which is where Qt says what it has
+/// to say. The lines are passed on, and kept for the tests to look through.
+struct Said {
+    lines: Arc<Mutex<Vec<String>>>,
+}
+
+impl Said {
+    /// Starts listening to standard error.
+    fn listen() -> Self {
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let mut ends = [0; 2];
+        // SAFETY: plain file descriptor calls, checked, made before any
+        // other thread exists; the reading end and the copy of the old
+        // standard error each get one owner.
+        let (heard, mut passed_on) = unsafe {
+            assert_eq!(libc::pipe(ends.as_mut_ptr()), 0, "a pipe for standard error");
+            let old = libc::dup(2);
+            assert!(
+                old >= 0 && libc::dup2(ends[1], 2) >= 0,
+                "standard error could not be redirected"
+            );
+            libc::close(ends[1]);
+            (std::fs::File::from_raw_fd(ends[0]), std::fs::File::from_raw_fd(old))
+        };
+        let kept = Arc::clone(&lines);
+        std::thread::spawn(move || {
+            for line in BufReader::new(heard).lines().map_while(Result::ok) {
+                let _ = writeln!(passed_on, "{line}");
+                kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).push(line);
+            }
+        });
+        Self { lines }
+    }
+
+    /// How many lines have been said so far.
+    fn mark(&self) -> usize {
+        self.lines.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).len()
+    }
+
+    /// The lines said since a mark.
+    fn since(&self, mark: usize) -> Vec<String> {
+        // What was just written takes a moment to come through the pipe.
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        self.lines.lock().unwrap_or_else(|poisoned| poisoned.into_inner())[mark..].to_vec()
+    }
+}
+
+fn main() {
+    // Never on the desktop, however the program is started: the session's
+    // own QT_QPA_PLATFORM (Omarchy sets wayland) is overridden. The renderer
+    // is the GPU's, as on screen, unless one is named.
+    std::env::set_var("QT_QPA_PLATFORM", "offscreen");
+    if std::env::var_os("QT_QUICK_BACKEND").is_none() {
+        std::env::set_var("QT_QUICK_BACKEND", "rhi");
+        std::env::set_var("QSG_RHI_BACKEND", "opengl");
+    }
+    std::env::set_var("QT_FORCE_STDERR_LOGGING", "1");
+    let said = Said::listen();
+
+    let wanted: Vec<String> = std::env::args()
+        .skip(1)
+        .filter(|argument| !argument.starts_with('-'))
+        .collect();
+    let application = QGuiApplication::new();
+    QQuickStyle::set_style(&QString::from("Material"));
+
+    let (mut passed, mut skipped, mut failed) = (0, 0, Vec::new());
+    for (name, test) in TESTS {
+        if !wanted.is_empty() && !wanted.iter().any(|want| name.contains(want.as_str())) {
+            continue;
+        }
+        let mark = said.mark();
+        let start = Start::new();
+        let ended = catch_unwind(AssertUnwindSafe(|| test(&start)));
+        // Any warning is a failure: a binding loop or a QML error is a bug
+        // even when the window still looks right.
+        let warnings = said.since(mark);
+        match ended {
+            Ok(Ended::Passed) if warnings.is_empty() => {
+                println!("test {name} ... ok");
+                passed += 1;
+            }
+            Ok(Ended::Skipped(why)) => {
+                println!("test {name} ... skipped: {why}");
+                skipped += 1;
+            }
+            Ok(Ended::Passed) => {
+                println!("test {name} ... FAILED: Qt had something to say:");
+                for line in &warnings {
+                    println!("    {line}");
+                }
+                failed.push(name);
+            }
+            Err(_) => {
+                println!("test {name} ... FAILED");
+                failed.push(name);
+            }
+        }
+    }
+    drop(application);
+    println!(
+        "\nscene tests: {passed} passed, {} failed, {skipped} skipped",
+        failed.len()
+    );
+    std::process::exit(i32::from(!failed.is_empty()));
+}

@@ -24,3 +24,7 @@ cxx-qt-build = "0.10"
 [dev-dependencies]
 tempfile = "3"
 zbus = { version = "6.3.0", default-features = false, features = ["default-rt", "service"] }
+
+[[test]]
+name = "scene"
+harness = false

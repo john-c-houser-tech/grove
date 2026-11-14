@@ -1,8 +1,6 @@
 //! How Grove is set up: from the environment for the real app, and by hand
 //! for tests, which keep everything of the desktop's out of reach.
 
-use std::sync::OnceLock;
-
 use std::path::PathBuf;
 
 use chrono::{NaiveDate, NaiveTime};
@@ -26,6 +24,9 @@ pub struct Options {
     /// Where the garden is kept; `None` for the user's data directory. A
     /// shortened session is only saved when a garden is given.
     pub garden_path: Option<PathBuf>,
+    /// Where the desktop keeps applications' data, for the garden when no
+    /// path is given; `None` keeps no garden at all.
+    pub data_directory: Option<PathBuf>,
     /// Omarchy's current-theme directory; `None` to follow no theme.
     pub theme_directory: Option<PathBuf>,
     /// How to ask Hyprland for its rounding; `None` to leave corners sharp.
@@ -55,6 +56,7 @@ impl Default for Options {
             date: None,
             weather: None,
             garden_path: None,
+            data_directory: None,
             theme_directory: None,
             hyprland: None,
             language_file: None,
@@ -100,6 +102,9 @@ impl Options {
         // The desktop's own: Omarchy's theme, and Hyprland when it is running.
         let set = |name: &str| variable(name).filter(|v| !v.is_empty());
         options.theme_directory = set("HOME").map(|home| PathBuf::from(home).join(".local/state/omarchy/current"));
+        options.data_directory = set("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| set("HOME").map(|home| PathBuf::from(home).join(".local/share")));
         options.language_file = set("HOME").map(|home| PathBuf::from(home).join(".config/omarchy/language"));
         options.omarchy_path = set("OMARCHY_PATH").map(PathBuf::from);
         // Where QSettings kept it, so a mute chosen before the port still holds.
@@ -118,20 +123,6 @@ impl Options {
         });
         options
     }
-}
-
-static INSTALLED: OnceLock<Options> = OnceLock::new();
-
-/// Fixes the options the app behind the QML singletons is made from. The
-/// engine makes the singletons itself, so they cannot be handed their options;
-/// the first call wins.
-pub fn install(options: Options) {
-    let _ = INSTALLED.set(options);
-}
-
-/// The installed options, or the defaults if none were.
-pub fn installed() -> Options {
-    INSTALLED.get().cloned().unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -187,10 +178,18 @@ mod tests {
         );
         assert_eq!(options.omarchy_path, Some(PathBuf::from("/opt/omarchy")));
         assert_eq!(
+            options.data_directory,
+            Some(PathBuf::from("/home/someone/.local/share"))
+        );
+        assert_eq!(
             options.settings_file,
             Some(PathBuf::from("/home/someone/.config/grove/grove.conf"))
         );
         let elsewhere = from(&[("HOME", "/home/someone"), ("XDG_CONFIG_HOME", "/cfg")]);
+        assert_eq!(
+            from(&[("XDG_DATA_HOME", "/data")]).data_directory,
+            Some(PathBuf::from("/data"))
+        );
         assert_eq!(elsewhere.settings_file, Some(PathBuf::from("/cfg/grove/grove.conf")));
         assert_eq!(
             options.theme_directory,

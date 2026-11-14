@@ -86,8 +86,9 @@ impl App {
         let path = options
             .garden_path
             .clone()
-            .unwrap_or_else(|| Garden::default_path(|name| std::env::var(name).ok()));
-        Self::with_garden(options, Garden::open(path))
+            .or_else(|| options.data_directory.as_deref().map(Garden::default_path));
+        let garden = path.map_or_else(Garden::unkept, Garden::open);
+        Self::with_garden(options, garden)
     }
 
     /// The app, keeping its plants in `garden`.
@@ -353,8 +354,7 @@ impl App {
         if outcome == Outcome::Done {
             events.push(Event::PlantGrown);
         }
-        let problem = self.garden.problem().cloned();
-        let change = self.garden.record(Plant {
+        let plant = Plant {
             seed: self.session.seed(),
             outcome,
             season: self.weather.season().name().to_string(),
@@ -366,11 +366,18 @@ impl App {
             } else {
                 0
             },
-        });
-        events.push(Event::Garden(change));
+        };
+        events.extend(self.record(plant));
+    }
+
+    /// Puts a plant into the garden.
+    pub fn record(&mut self, plant: Plant) -> Vec<Event> {
+        let problem = self.garden.problem().cloned();
+        let mut events = vec![Event::Garden(self.garden.record(plant))];
         if self.garden.problem() != problem.as_ref() {
             events.push(Event::GardenProblem);
         }
+        events
     }
 
     /// Read afresh for each session, since Grove may stay open for days.
@@ -410,6 +417,7 @@ mod tests {
             date: NaiveDate::from_ymd_opt(2026, 6, 21),
             weather: Some(Kind::Rain),
             garden_path: None,
+            data_directory: None,
             theme_directory: None,
             hyprland: None,
             language_file: None,

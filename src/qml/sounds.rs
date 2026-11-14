@@ -72,6 +72,7 @@ pub struct SoundsRust {
 
 impl cxx_qt::Initialize for qobject::Sounds {
     fn initialize(mut self: Pin<&mut Self>) {
+        shared::started("Sounds");
         // The player reports from its own thread; the news is carried here.
         let gui = self.qt_thread();
         let player = Player::new(move |report| {

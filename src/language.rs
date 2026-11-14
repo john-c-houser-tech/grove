@@ -28,7 +28,6 @@ pub enum Catalogs {
     /// The ones shipped inside the program.
     BuiltIn,
     /// `<code>.json` files in a directory, which tests use.
-    #[cfg_attr(not(test), expect(dead_code, reason = "only tests bring catalogs of their own"))]
     Directory(PathBuf),
 }
 

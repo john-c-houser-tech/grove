@@ -52,6 +52,7 @@ pub struct ThemeRust {
 
 impl cxx_qt::Initialize for qobject::Theme {
     fn initialize(mut self: Pin<&mut Self>) {
+        shared::started("Theme");
         let gui = self.qt_thread();
         shared::listen(move |event| {
             if event == Event::Theme {
