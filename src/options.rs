@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use chrono::{NaiveDate, NaiveTime};
 
+use crate::follow::Hyprland;
 use crate::weather::Kind;
 
 /// The settings everything is made from.
@@ -22,6 +23,10 @@ pub struct Options {
     /// Where the garden is kept; `None` for the user's data directory. A
     /// shortened session is only saved when a garden is given.
     pub garden_path: Option<PathBuf>,
+    /// Omarchy's current-theme directory; `None` to follow no theme.
+    pub theme_directory: Option<PathBuf>,
+    /// How to ask Hyprland for its rounding; `None` to leave corners sharp.
+    pub hyprland: Option<Hyprland>,
 }
 
 impl Default for Options {
@@ -32,13 +37,16 @@ impl Default for Options {
             date: None,
             weather: None,
             garden_path: None,
+            theme_directory: None,
+            hyprland: None,
         }
     }
 }
 
 impl Options {
     /// Options from the environment: GROVE_SECONDS, GROVE_TIME (HH:MM),
-    /// GROVE_DATE (YYYY-MM-DD), GROVE_WEATHER and GROVE_GARDEN. Nothing else reads the
+    /// GROVE_DATE (YYYY-MM-DD), GROVE_WEATHER and GROVE_GARDEN, and where the
+    /// desktop keeps its theme and Hyprland its sockets. Nothing else reads the
     /// environment.
     pub fn from_environment() -> Self {
         Self::from_variables(|name| std::env::var(name).ok())
@@ -59,6 +67,18 @@ impl Options {
         options.date = variable("GROVE_DATE").and_then(|v| NaiveDate::parse_from_str(&v, "%Y-%m-%d").ok());
         options.weather = variable("GROVE_WEATHER").and_then(|v| Kind::named(&v));
         options.garden_path = variable("GROVE_GARDEN").filter(|v| !v.is_empty()).map(PathBuf::from);
+        // The desktop's own: Omarchy's theme, and Hyprland when it is running.
+        let set = |name: &str| variable(name).filter(|v| !v.is_empty());
+        options.theme_directory = set("HOME").map(|home| PathBuf::from(home).join(".local/state/omarchy/current"));
+        options.hyprland = set("HYPRLAND_INSTANCE_SIGNATURE").map(|signature| Hyprland {
+            hyprctl: PathBuf::from("hyprctl"),
+            events: set("XDG_RUNTIME_DIR").map(|runtime| {
+                PathBuf::from(runtime)
+                    .join("hypr")
+                    .join(signature)
+                    .join(".socket2.sock")
+            }),
+        });
         options
     }
 }
@@ -110,6 +130,27 @@ mod tests {
         assert_eq!(options.time, NaiveTime::from_hms_opt(17, 5, 0));
         assert_eq!(options.date, NaiveDate::from_ymd_opt(2026, 10, 20));
         assert_eq!(options.weather, Some(Kind::Fog));
+    }
+
+    #[test]
+    fn the_desktop_is_found_from_the_environment() {
+        let options = from(&[
+            ("HOME", "/home/someone"),
+            ("HYPRLAND_INSTANCE_SIGNATURE", "abc"),
+            ("XDG_RUNTIME_DIR", "/run/user/1000"),
+        ]);
+        assert_eq!(
+            options.theme_directory,
+            Some(PathBuf::from("/home/someone/.local/state/omarchy/current"))
+        );
+        let hyprland = options.hyprland.unwrap();
+        assert_eq!(hyprland.hyprctl, PathBuf::from("hyprctl"));
+        assert_eq!(
+            hyprland.events,
+            Some(PathBuf::from("/run/user/1000/hypr/abc/.socket2.sock"))
+        );
+        // Without Hyprland no one is asked for the rounding.
+        assert_eq!(from(&[("HOME", "/home/someone")]).hyprland, None);
     }
 
     #[test]

@@ -4,11 +4,11 @@
 
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, Timelike};
 
-use crate::color::Color;
 use crate::garden::{self, Garden, Outcome, Plant};
-use crate::light::{Moment, Sky, DEFAULT_ACCENT};
+use crate::light::{Moment, Sky};
 use crate::options::Options;
 use crate::session::{Session, State, SEED_LIMIT};
+use crate::theme::Theme;
 use crate::weather::Weather;
 
 /// Something that changed, for the window to hear about.
@@ -24,6 +24,8 @@ pub enum Event {
     Growth,
     /// The light moved on, or the accent changed.
     Light,
+    /// The desktop's accent or corner radius changed.
+    Theme,
     /// The garden's plants changed, in the way given.
     Garden(garden::Change),
     /// The garden's problem changed.
@@ -37,7 +39,7 @@ pub struct App {
     fixed: Option<NaiveDateTime>,
     session: Session,
     weather: Weather,
-    accent: Color,
+    theme: Theme,
     sky: Sky,
     garden: Garden,
 }
@@ -62,12 +64,12 @@ impl App {
                 .unwrap_or(now.date())
                 .and_time(options.time.unwrap_or(now.time()))
         });
-        let accent = Color::hex(DEFAULT_ACCENT);
+        let theme = Theme::read(options.theme_directory.clone());
         let mut app = Self {
             session: Session::new(options.seconds),
             weather: Weather::new(options.weather),
-            sky: Sky::at(moment(fixed.unwrap_or(now)), accent),
-            accent,
+            sky: Sky::at(moment(fixed.unwrap_or(now)), theme.accent_color()),
+            theme,
             fixed,
             garden,
             options,
@@ -87,6 +89,14 @@ impl App {
 
     pub fn sky(&self) -> &Sky {
         &self.sky
+    }
+
+    pub fn options(&self) -> &Options {
+        &self.options
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.theme
     }
 
     pub fn garden(&self) -> &Garden {
@@ -113,21 +123,29 @@ impl App {
 
     /// Reads the clock again for the sky, unless the sky is frozen.
     pub fn refresh_light(&mut self) -> Vec<Event> {
-        self.sky = Sky::at(
-            moment(self.fixed.unwrap_or_else(|| Local::now().naive_local())),
-            self.accent,
-        );
+        let when = self.fixed.unwrap_or_else(|| Local::now().naive_local());
+        // Dusk warms toward the desktop accent.
+        self.sky = Sky::at(moment(when), self.theme.accent_color());
         vec![Event::Light]
     }
 
-    /// Dusk warms toward the desktop accent.
-    #[cfg_attr(not(test), expect(dead_code, reason = "called by the theme, which is ported next"))]
-    pub fn set_accent(&mut self, accent: Color) -> Vec<Event> {
-        if accent == self.accent {
+    /// Reads the theme's accent again, after its files changed.
+    pub fn reload_theme(&mut self) -> Vec<Event> {
+        if !self.theme.reload() {
             return Vec::new();
         }
-        self.accent = accent;
-        self.refresh_light()
+        let mut events = vec![Event::Theme];
+        events.extend(self.refresh_light());
+        events
+    }
+
+    /// Takes the rounding Hyprland reported.
+    pub fn set_radius(&mut self, radius: i32) -> Vec<Event> {
+        if self.theme.set_radius(radius) {
+            vec![Event::Theme]
+        } else {
+            Vec::new()
+        }
     }
 
     /// What follows from a change to the session.
@@ -221,6 +239,8 @@ mod tests {
             date: NaiveDate::from_ymd_opt(2026, 6, 21),
             weather: Some(Kind::Rain),
             garden_path: None,
+            theme_directory: None,
+            hyprland: None,
         }
     }
 
@@ -249,10 +269,31 @@ mod tests {
         let before = *app.sky();
         assert_eq!(app.refresh_light(), vec![Event::Light]);
         assert_eq!(*app.sky(), before);
-        // The accent only colours dusk, so noon looks the same under another.
-        assert_eq!(app.set_accent(Color::hex("#112233")), vec![Event::Light]);
-        assert_eq!(app.sky().top, before.top);
-        assert_eq!(app.set_accent(Color::hex("#112233")), vec![]);
+    }
+
+    #[test]
+    fn the_theme_colours_dusk_and_rounds_corners() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir(dir.path().join("theme")).unwrap();
+        let colors = dir.path().join("theme/colors.toml");
+        std::fs::write(&colors, "accent = \"#112233\"\n").unwrap();
+        let dusk = Options {
+            time: NaiveTime::from_hms_opt(20, 0, 0),
+            theme_directory: Some(dir.path().to_path_buf()),
+            ..options(10)
+        };
+        let mut app = App::with_garden(dusk, nowhere());
+        assert_eq!(app.theme().accent(), "#112233");
+        let horizon = app.sky().bottom;
+
+        assert_eq!(app.reload_theme(), vec![]);
+        std::fs::write(&colors, "accent = \"#ff0000\"\n").unwrap();
+        assert_eq!(app.reload_theme(), vec![Event::Theme, Event::Light]);
+        assert_ne!(app.sky().bottom, horizon);
+
+        assert_eq!(app.set_radius(8), vec![Event::Theme]);
+        assert_eq!(app.set_radius(8), vec![]);
+        assert_eq!(app.theme().radius(), 8);
     }
 
     #[test]

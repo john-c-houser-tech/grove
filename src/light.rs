@@ -7,9 +7,6 @@ use std::f64::consts::PI;
 use crate::color::Color;
 use crate::easing::{clamp01, smoothstep};
 
-/// The accent the sky warms toward until the theme gives its own.
-pub const DEFAULT_ACCENT: &str = "#FFD60A";
-
 /// A moment as the sky needs it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Moment {
@@ -159,6 +156,7 @@ impl Sky {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::theme::DEFAULT_ACCENT;
 
     // Days of 2026: 21 June, 6 November and 21 December.
     const MIDSUMMER: u32 = 172;

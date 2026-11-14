@@ -3,11 +3,13 @@
 mod app;
 mod color;
 mod easing;
+mod follow;
 mod garden;
 mod light;
 mod options;
 mod qml;
 mod session;
+mod theme;
 mod weather;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};

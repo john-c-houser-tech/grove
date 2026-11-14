@@ -15,6 +15,7 @@ fn main() {
         "src/qml/backend.rs",
         "src/qml/garden.rs",
         "src/qml/light.rs",
+        "src/qml/theme.rs",
         "src/qml/weather.rs",
     ])
     .qt_module("Quick")

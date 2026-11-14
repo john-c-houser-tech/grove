@@ -45,7 +45,13 @@ QtObject {
         function onProblemChanged() { console.log("garden problem:", Garden.problem) }
     }
 
+    property Connections theme: Connections {
+        target: Theme
+        function onChanged() { console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius) }
+    }
+
     Component.onCompleted: {
+        console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius)
         console.log("garden", Garden.grown, "grown", Garden.wilted, "wilted", "problem:", Garden.problem)
         console.log("state", Backend.state, "seconds", Backend.seconds, "remaining", Backend.remaining)
         console.log("light", Light.skyTop, Light.sunUp, "ambient", Math.round(Light.ambient * 100) / 100, "night", Light.nightTint)

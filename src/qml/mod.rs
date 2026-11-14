@@ -6,4 +6,5 @@ mod color;
 pub mod garden;
 pub mod light;
 mod shared;
+pub mod theme;
 pub mod weather;
