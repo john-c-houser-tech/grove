@@ -87,7 +87,7 @@ use chrono::{Local, TimeZone};
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{QByteArray, QDateTime, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
 
-use super::shared;
+use super::shared::{self, tr};
 use crate::app::Event;
 use crate::garden::{Change, Plant, Problem};
 
@@ -110,7 +110,8 @@ impl cxx_qt::Initialize for qobject::Garden {
         shared::listen(move |event| {
             let _ = match event {
                 Event::Garden(change) => gui.queue(move |garden| garden.show(change)),
-                Event::GardenProblem => gui.queue(|garden| garden.problem_changed()),
+                // A new language puts the problem into other words.
+                Event::GardenProblem | Event::Language => gui.queue(|garden| garden.problem_changed()),
                 _ => Ok(()),
             };
         });
@@ -204,15 +205,15 @@ fn when(plant: &Plant) -> Option<QDateTime> {
     QDateTime::try_from(local).ok()
 }
 
-/// A problem, in words for the window.
+/// A problem, in words for the window, in the language of the moment.
 fn words(problem: &Problem) -> String {
     match problem {
-        Problem::CannotOpen => "Could not open the garden file, so new plants will not be saved.".into(),
+        Problem::CannotOpen => tr("Could not open the garden file, so new plants will not be saved."),
         Problem::CannotRead => {
-            "The garden file could not be read. It was left untouched, and new plants will not be saved.".into()
+            tr("The garden file could not be read. It was left untouched, and new plants will not be saved.")
         }
-        Problem::NoFolder => "Could not create the garden folder, so this plant was not saved.".into(),
-        Problem::Busy => "Another Grove kept the garden busy, so this plant was not saved.".into(),
-        Problem::CannotSave(why) => format!("Could not save the garden: {why}"),
+        Problem::NoFolder => tr("Could not create the garden folder, so this plant was not saved."),
+        Problem::Busy => tr("Another Grove kept the garden busy, so this plant was not saved."),
+        Problem::CannotSave(why) => tr("Could not save the garden: %1").replace("%1", why),
     }
 }

@@ -28,24 +28,64 @@ pub struct Hyprland {
     pub events: Option<PathBuf>,
 }
 
-/// Something `Following::stop` or the watcher tells the watching thread.
+/// What the watcher's thread is told.
 enum News {
     Changed,
     Stop,
 }
 
+/// A thread watching files. It stops when this is dropped, or by itself once
+/// its callback says there is no one left to tell.
+pub struct Watching {
+    thread: Sender<News>,
+}
+
+impl Drop for Watching {
+    fn drop(&mut self) {
+        let _ = self.thread.send(News::Stop);
+    }
+}
+
 /// The threads following the desktop. They stop when this is dropped, or by
 /// themselves once a callback says there is no one left to tell.
 pub struct Following {
-    watching: Option<Sender<News>>,
+    _watching: Option<Watching>,
 }
 
-impl Drop for Following {
-    fn drop(&mut self) {
-        if let Some(watching) = &self.watching {
-            let _ = watching.send(News::Stop);
+/// Watches the paths `paths` names, and calls `changed`, on a thread of its
+/// own, when any of them changes; a burst of changes is told once, when it
+/// has settled. `paths` is asked again after every change, since what was
+/// watched may have been replaced. `changed` returns false when there is no
+/// one left to tell, which ends the thread.
+pub fn watch(
+    paths: impl Fn() -> Vec<PathBuf> + Send + 'static,
+    changed: impl Fn() -> bool + Send + 'static,
+) -> Watching {
+    let (tell, told) = mpsc::channel::<News>();
+    let from_watcher = tell.clone();
+    std::thread::spawn(move || {
+        let Ok(mut watcher) = notify::recommended_watcher(move |_| {
+            let _ = from_watcher.send(News::Changed);
+        }) else {
+            return;
+        };
+        let mut watched = rewatch(&mut watcher, paths(), Vec::new());
+        while let Ok(News::Changed) = told.recv() {
+            // Wait until the changes stop coming.
+            loop {
+                match told.recv_timeout(SETTLE) {
+                    Ok(News::Changed) => {}
+                    Ok(News::Stop) | Err(RecvTimeoutError::Disconnected) => return,
+                    Err(RecvTimeoutError::Timeout) => break,
+                }
+            }
+            watched = rewatch(&mut watcher, paths(), watched);
+            if !changed() {
+                return;
+            }
         }
-    }
+    });
+    Watching { thread: tell }
 }
 
 /// Starts following the theme in `directory` and, when given, Hyprland's
@@ -103,45 +143,24 @@ pub fn follow(
     });
 
     let watching = directory.map(|directory| {
-        let (tell, told) = mpsc::channel::<News>();
-        let from_watcher = tell.clone();
-        std::thread::spawn(move || {
-            let Ok(mut watcher) = notify::recommended_watcher(move |_| {
-                let _ = from_watcher.send(News::Changed);
-            }) else {
-                return;
-            };
-            let mut watched = rewatch(&mut watcher, &directory, Vec::new());
-            while let Ok(News::Changed) = told.recv() {
-                // Wait until the changes stop coming.
-                loop {
-                    match told.recv_timeout(SETTLE) {
-                        Ok(News::Changed) => {}
-                        Ok(News::Stop) | Err(RecvTimeoutError::Disconnected) => return,
-                        Err(RecvTimeoutError::Timeout) => break,
-                    }
-                }
-                // What was watched may have been replaced, so watch afresh.
-                watched = rewatch(&mut watcher, &directory, watched);
+        watch(
+            move || paths_to_watch(&directory),
+            move || {
                 if let Some(ask) = &ask {
                     let _ = ask.send(());
                 }
-                if !theme_changed() {
-                    return;
-                }
-            }
-        });
-        tell
+                theme_changed()
+            },
+        )
     });
-    Following { watching }
+    Following { _watching: watching }
 }
 
-/// Stops watching `watched` and watches what there is to watch now.
-fn rewatch(watcher: &mut impl Watcher, directory: &Path, watched: Vec<PathBuf>) -> Vec<PathBuf> {
+/// Stops watching `watched` and watches `paths`, as far as they can be.
+fn rewatch(watcher: &mut impl Watcher, mut paths: Vec<PathBuf>, watched: Vec<PathBuf>) -> Vec<PathBuf> {
     for path in &watched {
         let _ = watcher.unwatch(path);
     }
-    let mut paths = paths_to_watch(directory);
     paths.retain(|path| watcher.watch(path, RecursiveMode::NonRecursive).is_ok());
     paths
 }

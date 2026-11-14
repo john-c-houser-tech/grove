@@ -5,6 +5,7 @@ mod color;
 mod easing;
 mod follow;
 mod garden;
+mod language;
 mod light;
 mod options;
 mod qml;
@@ -20,7 +21,7 @@ fn main() {
     let mut application = QGuiApplication::new();
     let mut engine = QQmlApplicationEngine::new();
     if let Some(engine) = engine.as_mut() {
-        engine.load(&QUrl::from("qrc:/qt/qml/Grove/src/Port.qml"));
+        engine.load(&QUrl::from("qrc:/qt/qml/Grove/src/qml/Port.qml"));
     }
     if let Some(application) = application.as_mut() {
         application.exec();

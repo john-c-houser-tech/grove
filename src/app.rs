@@ -2,9 +2,12 @@
 //! session, and the weather and light that follow it. It knows nothing of Qt;
 //! the QML types in `qml/` show it to the window and pass on what changed.
 
+use std::sync::Arc;
+
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, Timelike};
 
 use crate::garden::{self, Garden, Outcome, Plant};
+use crate::language::{self, Catalog};
 use crate::light::{Moment, Sky};
 use crate::options::Options;
 use crate::session::{Session, State, SEED_LIMIT};
@@ -26,6 +29,8 @@ pub enum Event {
     Light,
     /// The desktop's accent or corner radius changed.
     Theme,
+    /// The language changed, so everything said is said again.
+    Language,
     /// The garden's plants changed, in the way given.
     Garden(garden::Change),
     /// The garden's problem changed.
@@ -42,6 +47,8 @@ pub struct App {
     theme: Theme,
     sky: Sky,
     garden: Garden,
+    /// The current language's strings, shared with whoever translates.
+    catalog: Arc<Catalog>,
 }
 
 impl App {
@@ -65,6 +72,7 @@ impl App {
                 .and_time(options.time.unwrap_or(now.time()))
         });
         let theme = Theme::read(options.theme_directory.clone());
+        let catalog = Arc::new(Catalog::load(&language_code(&options), &options.catalogs));
         let mut app = Self {
             session: Session::new(options.seconds),
             weather: Weather::new(options.weather),
@@ -72,6 +80,7 @@ impl App {
             theme,
             fixed,
             garden,
+            catalog,
             options,
         };
         // The idle window has weather too, until the first session rolls its own.
@@ -101,6 +110,27 @@ impl App {
 
     pub fn garden(&self) -> &Garden {
         &self.garden
+    }
+
+    /// The current language's strings.
+    pub fn catalog(&self) -> &Arc<Catalog> {
+        &self.catalog
+    }
+
+    /// The name of the locale numbers and dates are formatted with.
+    pub fn format_locale(&self) -> String {
+        language::format_locale(self.catalog.code(), self.options.omarchy_path.as_deref())
+    }
+
+    /// Reads the language again, after its file changed. Catalogs do not
+    /// change while Grove runs, so only another language is news.
+    pub fn reload_language(&mut self) -> Vec<Event> {
+        let code = language_code(&self.options);
+        if code == self.catalog.code() {
+            return Vec::new();
+        }
+        self.catalog = Arc::new(Catalog::load(&code, &self.options.catalogs));
+        vec![Event::Language]
     }
 
     /// Starts a session growing the plant of `seed`, unless one is growing.
@@ -216,6 +246,14 @@ impl App {
     }
 }
 
+/// The language Omarchy is set to; English without Omarchy.
+fn language_code(options: &Options) -> String {
+    options
+        .language_file
+        .as_deref()
+        .map_or_else(|| "en".to_string(), language::read_code)
+}
+
 /// A date and time as the sky takes it.
 fn moment(when: NaiveDateTime) -> Moment {
     let time = when.time();
@@ -241,6 +279,9 @@ mod tests {
             garden_path: None,
             theme_directory: None,
             hyprland: None,
+            language_file: None,
+            catalogs: crate::language::Catalogs::BuiltIn,
+            omarchy_path: None,
         }
     }
 
@@ -294,6 +335,31 @@ mod tests {
         assert_eq!(app.set_radius(8), vec![Event::Theme]);
         assert_eq!(app.set_radius(8), vec![]);
         assert_eq!(app.theme().radius(), 8);
+    }
+
+    #[test]
+    fn the_language_follows_its_file() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let file = dir.path().join("language");
+        std::fs::write(&file, "de\n").unwrap();
+        let mut app = App::with_garden(
+            Options {
+                language_file: Some(file.clone()),
+                ..options(10)
+            },
+            nowhere(),
+        );
+        assert_eq!(app.catalog().code(), "de");
+        assert_eq!(app.catalog().translate("Garden", None), Some("Garten"));
+        assert_eq!(app.format_locale(), "de");
+
+        assert_eq!(app.reload_language(), vec![]);
+        std::fs::write(&file, "fr\n").unwrap();
+        assert_eq!(app.reload_language(), vec![Event::Language]);
+        assert_eq!(app.catalog().translate("Garden", None), Some("Jardin"));
+        std::fs::remove_file(&file).unwrap();
+        assert_eq!(app.reload_language(), vec![Event::Language]);
+        assert_eq!(app.catalog().code(), "en");
     }
 
     #[test]

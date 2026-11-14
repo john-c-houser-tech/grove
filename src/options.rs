@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use chrono::{NaiveDate, NaiveTime};
 
 use crate::follow::Hyprland;
+use crate::language::Catalogs;
 use crate::weather::Kind;
 
 /// The settings everything is made from.
@@ -27,6 +28,12 @@ pub struct Options {
     pub theme_directory: Option<PathBuf>,
     /// How to ask Hyprland for its rounding; `None` to leave corners sharp.
     pub hyprland: Option<Hyprland>,
+    /// Where Omarchy keeps the language code; `None` for English.
+    pub language_file: Option<PathBuf>,
+    /// Where the catalogs are read from; tests give a directory of their own.
+    pub catalogs: Catalogs,
+    /// Where Omarchy is installed, for its registry of locales.
+    pub omarchy_path: Option<PathBuf>,
 }
 
 impl Default for Options {
@@ -39,6 +46,9 @@ impl Default for Options {
             garden_path: None,
             theme_directory: None,
             hyprland: None,
+            language_file: None,
+            catalogs: Catalogs::BuiltIn,
+            omarchy_path: None,
         }
     }
 }
@@ -70,6 +80,8 @@ impl Options {
         // The desktop's own: Omarchy's theme, and Hyprland when it is running.
         let set = |name: &str| variable(name).filter(|v| !v.is_empty());
         options.theme_directory = set("HOME").map(|home| PathBuf::from(home).join(".local/state/omarchy/current"));
+        options.language_file = set("HOME").map(|home| PathBuf::from(home).join(".config/omarchy/language"));
+        options.omarchy_path = set("OMARCHY_PATH").map(PathBuf::from);
         options.hyprland = set("HYPRLAND_INSTANCE_SIGNATURE").map(|signature| Hyprland {
             hyprctl: PathBuf::from("hyprctl"),
             events: set("XDG_RUNTIME_DIR").map(|runtime| {
@@ -138,7 +150,13 @@ mod tests {
             ("HOME", "/home/someone"),
             ("HYPRLAND_INSTANCE_SIGNATURE", "abc"),
             ("XDG_RUNTIME_DIR", "/run/user/1000"),
+            ("OMARCHY_PATH", "/opt/omarchy"),
         ]);
+        assert_eq!(
+            options.language_file,
+            Some(PathBuf::from("/home/someone/.config/omarchy/language"))
+        );
+        assert_eq!(options.omarchy_path, Some(PathBuf::from("/opt/omarchy")));
         assert_eq!(
             options.theme_directory,
             Some(PathBuf::from("/home/someone/.local/state/omarchy/current"))

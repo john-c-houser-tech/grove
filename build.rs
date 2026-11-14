@@ -8,7 +8,7 @@ fn main() {
             .version(1, 0)
             // Scaffolding for the port: a window-less stand-in for Main.qml,
             // which needs every singleton and takes its place once they exist.
-            .qml_file("src/Port.qml")
+            .qml_file("src/qml/Port.qml")
             .depend("QtQuick"),
     )
     .files([
@@ -16,6 +16,7 @@ fn main() {
         "src/qml/garden.rs",
         "src/qml/light.rs",
         "src/qml/theme.rs",
+        "src/qml/translator.rs",
         "src/qml/weather.rs",
     ])
     .qt_module("Quick")

@@ -7,4 +7,5 @@ pub mod garden;
 pub mod light;
 mod shared;
 pub mod theme;
+pub mod translator;
 pub mod weather;

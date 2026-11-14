@@ -50,7 +50,15 @@ QtObject {
         function onChanged() { console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius) }
     }
 
+    property Connections language: Connections {
+        target: Translator
+        function onChanged() { console.log("language", Translator.language, "rtl", Translator.rightToLeft, Qt.application.layoutDirection, port.said) }
+    }
+    // Retranslated by the engine when the language changes.
+    property string said: qsTr("Garden") + " / " + qsTr("%n minutes", "", 25) + " / " + Number(1234.5).toLocaleString(Qt.locale(Translator.locale))
+
     Component.onCompleted: {
+        console.log("language", Translator.language, "rtl", Translator.rightToLeft, port.said)
         console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius)
         console.log("garden", Garden.grown, "grown", Garden.wilted, "wilted", "problem:", Garden.problem)
         console.log("state", Backend.state, "seconds", Backend.seconds, "remaining", Backend.remaining)
