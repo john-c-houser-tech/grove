@@ -1,9 +1,11 @@
-# CI: bin/lint (formatting, warnings as errors, clang-tidy, qmllint, the
-# translation catalogs) and bin/test (the unit tests and the offscreen scene
-# tests), in an Arch Linux container that installs from Omarchy's stable
-# mirror, the one the desktop uses, so Qt and clang are the versions Grove is
-# built with there. bin/check-leaks takes longer and is run by hand, as
-# CODING_STANDARDS.md says. No secrets, no network beyond the packages.
+# CI: bin/lint (formatting, compiler and clippy warnings as errors, qmllint,
+# the translation catalogs, and cargo audit over the packages Grove is built
+# from) and bin/test (the unit tests and the offscreen scene tests), in an
+# Arch Linux container that installs from Omarchy's stable mirror, the one the
+# desktop uses, so Qt and Rust are the versions Grove is built with there.
+# bin/check-leaks takes longer and is run by hand, as CODING_STANDARDS.md
+# says. No secrets; the network is used for the packages, Rust's crates, and
+# the advisory list cargo audit checks them against.
 # The ruleset on main requires the one "CI result" check; keep that job's name.
 name: CI
 
@@ -28,7 +30,7 @@ jobs:
     container: archlinux:latest
     steps:
       # Omarchy's stable mirror lags upstream Arch; without it CI would get a
-      # new clang or Qt before the desktop and could fail lint on code that
+      # new Rust or Qt before the desktop and could fail lint on code that
       # passes there. -Syuu also steps back anything in the image that is newer
       # than the mirror. The keyring goes first, so a key newer than the image
       # is known.
@@ -36,11 +38,10 @@ jobs:
         run: |
           echo 'Server = https://stable-mirror.omarchy.org/$repo/os/$arch' > /etc/pacman.d/mirrorlist
           pacman -Sy --noconfirm archlinux-keyring
-          pacman -Suu --noconfirm --needed git base-devel clang python mesa ttf-dejavu \
-            qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg \
-            xorg-server-xvfb xorg-xauth
-          pacman -Q qt6-base qt6-declarative clang mesa
-      - uses: actions/checkout@v7
+          pacman -Suu --noconfirm --needed git base-devel rust cargo-audit python mesa ttf-dejavu \
+            qt6-base qt6-declarative alsa-lib dbus xorg-server-xvfb xorg-xauth
+          pacman -Q qt6-base qt6-declarative rust cargo-audit mesa
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false  # nothing after this needs git access
       # The container runs as root; the checks run as a normal user, as they
@@ -54,8 +55,10 @@ jobs:
       # bin/test runs offscreen, as on a desktop; offscreen Qt takes its OpenGL
       # from an X display when there is one, so a virtual one (Mesa's software
       # renderer) lets the scene tests draw. Without it they abort.
+      # A session bus of the tests' own, so the notification test has a
+      # service to talk to.
       - name: Tests
-        run: su ci -c "cd '$GITHUB_WORKSPACE' && xvfb-run -a bin/test"
+        run: su ci -c "cd '$GITHUB_WORKSPACE' && dbus-run-session -- xvfb-run -a bin/test"
 
   # The one check main's ruleset requires.
   result:

@@ -34,7 +34,6 @@
   "No desktop session bus, so Grove cannot send notifications.": "Ingen sessionsbus på skrivebordet, så Grove kan ikke sende notifikationer.",
   "No notification service is running, so Grove cannot tell you when a plant is done.": "Ingen notifikationstjeneste kører, så Grove kan ikke fortælle dig, når en plante er færdig.",
   "No audio output found, so the distant sounds are silent.": "Ingen lydudgang fundet, så de fjerne lyde er tavse.",
-  "The audio output cannot play 16-bit sound, so the distant sounds are silent.": "Lydudgangen kan ikke afspille 16-bit lyd, så de fjerne lyde er tavse.",
   "Sounds are off. M turns them on.": "Lyden er slået fra. M slår den til.",
   "Mute or unmute distant sounds": "Slå fjerne lyde fra eller til",
   "Another Grove kept the garden busy, so this plant was not saved.": "En anden Grove holdt haven optaget, så denne plante blev ikke gemt.",

@@ -33,7 +33,6 @@
   "No desktop session bus, so Grove cannot send notifications.": "デスクトップのセッションバスがないため、Groveは通知を送れません。",
   "No notification service is running, so Grove cannot tell you when a plant is done.": "通知サービスが動いていないため、Groveは植物が育ったことをお知らせできません。",
   "No audio output found, so the distant sounds are silent.": "音声出力が見つからないため、遠くの音は鳴りません。",
-  "The audio output cannot play 16-bit sound, so the distant sounds are silent.": "音声出力が16ビット音声を再生できないため、遠くの音は鳴りません。",
   "Sounds are off. M turns them on.": "サウンドはオフです。Mでオンにします。",
   "Mute or unmute distant sounds": "遠くの音のミュートを切り替える",
   "Another Grove kept the garden busy, so this plant was not saved.": "別のGroveが庭を使用中だったため、この植物は保存されませんでした。",

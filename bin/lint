@@ -1,42 +1,51 @@
 #!/bin/sh
-# Every static check, any finding fails: the formatting, the compiler's
-# warnings, clang-tidy, qmllint, and the translation catalogs. The memory checks are in
-# bin/check-leaks, the tests in bin/test, and bin/check runs all three.
+# Every static check, any finding fails (advisory warnings too): the formatting, the compiler's and
+# clippy's warnings, qmllint, the translation catalogs, and the packages
+# Grove is built from against the published security advisories. The memory
+# checks are in bin/check-leaks, the tests in bin/test, and bin/check runs
+# all three.
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+# Cargo builds into the repository's own target/, which the rest of this
+# script reads from, whatever the environment says elsewhere.
+export CARGO_TARGET_DIR="$ROOT/target"
 cd "$ROOT"
-CXX_FILES="src/*.cpp src/*.h tests/*.cpp"
 
-echo "formatting (.clang-format)"
-# shellcheck disable=SC2086
-clang-format --dry-run --Werror $CXX_FILES
+echo "formatting (rustfmt.toml)"
+cargo fmt --check
 
-echo "compiler warnings, as errors"
-mkdir -p build/lint
-cd build/lint
-qmake6 "$ROOT/grove.pro" "QMAKE_CXXFLAGS+=-Werror" >/dev/null
-make -j"$(nproc)" >/dev/null
-
-echo "clang-tidy (.clang-tidy)"
-# qmake writes no compile_commands.json, so the defines and include paths come
-# from the Makefile it generated, read from where it was generated.
-defines=$(sed -n 's/^DEFINES *= *//p' Makefile)
-includes=$(sed -n 's/^INCPATH *= *//p' Makefile)
-# shellcheck disable=SC2086
-clang-tidy --quiet "$ROOT"/src/*.cpp -- -std=c++17 -fPIC $defines $includes
+echo "compiler and clippy warnings, as errors"
+cargo clippy --locked --all-targets -- -D warnings
 
 echo "qmllint (the QML, against the Grove module this build describes)"
-# The build writes grove.qmltypes, the C++ types and singletons QML can use;
-# a qmldir beside it makes it a module qmllint can import.
-mkdir -p qmlmodules/Grove
-cp grove.qmltypes qmlmodules/Grove/
-printf 'module Grove\ntypeinfo grove.qmltypes\ndepends QtQuick\n' >qmlmodules/Grove/qmldir
-# From the root: qmllint also reads any .qmltypes in its working directory.
-cd "$ROOT"
-"$(qmake6 -query QT_HOST_BINS)/qmllint" --max-warnings 0 -I build/lint/qmlmodules src/*.qml
+# The build writes the module's types, the Rust types and singletons QML can
+# use, under target/cxxqt/qml_modules, where qmllint finds it by name.
+"$(qmake6 -query QT_HOST_BINS)/qmllint" --max-warnings 0 -I target/cxxqt/qml_modules src/*.qml
 
 echo "translation catalogs"
 bin/check-i18n
+
+echo "security advisories (cargo audit)"
+if cargo audit --version >/dev/null 2>&1; then
+    # Warnings fail too: a crate that is unsound, unmaintained or yanked.
+    if ! audit="$(cargo audit --deny warnings 2>&1)"; then
+        if [ -z "${CI:-}" ] && printf '%s\n' "$audit" | grep -q "couldn't fetch advisory database"; then
+            # Offline on a desktop: the advisories already fetched are
+            # checked, and it says so. CI always fetches them afresh.
+            echo "cargo audit: offline, so checking against the advisories fetched before"
+            cargo audit --deny warnings --no-fetch
+        else
+            printf '%s\n' "$audit"
+            exit 1
+        fi
+    else
+        printf '%s\n' "$audit" | tail -1
+    fi
+else
+    # CI always runs it; a desktop without the tool is told, not failed, so
+    # the other checks can still be run there.
+    echo "cargo audit: not installed, so skipped here (sudo pacman -S cargo-audit); CI runs it"
+fi
 
 echo "lint passed"
