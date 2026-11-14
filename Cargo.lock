@@ -498,6 +498,7 @@ dependencies = [
  "cxx-qt-build",
  "cxx-qt-lib",
  "fastrand",
+ "libc",
  "notify",
  "rodio",
  "serde_json",

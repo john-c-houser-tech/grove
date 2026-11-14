@@ -6,11 +6,22 @@ fn main() {
     CxxQtBuilder::new_qml_module(
         QmlModule::new("Grove")
             .version(1, 0)
-            // Scaffolding for the port: a window-less stand-in for Main.qml,
-            // which needs every singleton and takes its place once they exist.
-            .qml_file("src/qml/Port.qml")
+            .qml_files([
+                "src/CloudShape.qml",
+                "src/Clouds.qml",
+                "src/GardenView.qml",
+                "src/GrowingPlant.qml",
+                "src/Main.qml",
+                "src/Plane.qml",
+                "src/Precipitation.qml",
+                "src/SkyBackdrop.qml",
+                "src/SoftGlow.qml",
+                "src/Train.qml",
+            ])
             .depend("QtQuick"),
     )
+    // Every file with a bridge in it: one left out compiles, but QML never
+    // hears of its types.
     .files([
         "src/qml/backend.rs",
         "src/qml/garden.rs",
@@ -23,6 +34,9 @@ fn main() {
         "src/qml/translator.rs",
         "src/qml/weather.rs",
     ])
+    // The pictures the rain and snow are made of, beside the QML that names
+    // them.
+    .qrc_resources(["src/images/rain.png", "src/images/snow.png"])
     .qt_module("Quick")
     .build();
 }

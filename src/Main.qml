@@ -37,8 +37,7 @@ ApplicationWindow {
     // Numbers take the language's digits and separators, and re-render when
     // the language changes.
     function number(n) {
-        var lang = Translator.language
-        return n.toLocaleString(Qt.locale(), 'f', 0)
+        return n.toLocaleString(Qt.locale(Translator.locale), 'f', 0)
     }
     function clock(seconds) {
         var m = Math.floor(seconds / 60), s = seconds % 60
