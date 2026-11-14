@@ -272,11 +272,10 @@ pub unsafe fn update_paint_node<L: Layer>(mut layer: Pin<&mut L>, old: *mut QSGN
     node.cast::<QSGNode>()
 }
 
-/// The item was resized, so its picture no longer fits.
-pub fn geometry_changed<L: Layer>(layer: Pin<&mut L>, new_geometry: &QRectF, old_geometry: &QRectF) {
-    if new_geometry.width() != old_geometry.width() || new_geometry.height() != old_geometry.height() {
-        schedule_render(layer);
-    }
+/// Whether a change of geometry changed the item's size, so that its
+/// picture no longer fits.
+pub fn resized(new_geometry: &QRectF, old_geometry: &QRectF) -> bool {
+    new_geometry.width() != old_geometry.width() || new_geometry.height() != old_geometry.height()
 }
 
 /// The item came into a window, or moved to a display of another scale.
