@@ -15,6 +15,7 @@ fastrand = "2"
 serde_json = "1"
 notify = "8.2.2"
 zbus = { version = "6.3.0", default-features = false, features = ["default-rt"] }
+rodio = { version = "0.23.0", default-features = false, features = ["playback"] }
 
 [build-dependencies]
 cxx-qt-build = "0.10"

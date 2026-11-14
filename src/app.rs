@@ -11,7 +11,10 @@ use crate::language::{self, Catalog};
 use crate::light::{Moment, Sky};
 use crate::notifier;
 use crate::options::Options;
+use crate::player;
 use crate::session::{Session, State, SEED_LIMIT};
+use crate::settings;
+use crate::sounds::{self, Period, Plan};
 use crate::theme::Theme;
 use crate::weather::Weather;
 
@@ -36,6 +39,17 @@ pub enum Event {
     PlantGrown,
     /// Whether notifications work changed.
     NotifierProblem,
+    /// A sound of that kind is coming in this session, and can be made.
+    SoundComing(sounds::Kind),
+    /// A sound of that kind is due now, with its picture.
+    Sound(sounds::Kind),
+    /// The session's sounds are over: one under way fades out, with its
+    /// picture, and one still waiting is dropped.
+    SoundsEnded,
+    /// The sounds were muted or unmuted.
+    Muted,
+    /// Whether the sounds can be heard changed.
+    SoundProblem,
     /// The garden's plants changed, in the way given.
     Garden(garden::Change),
     /// The garden's problem changed.
@@ -58,6 +72,11 @@ pub struct App {
     /// why notifications cannot be sent, if they cannot.
     last_notification: u32,
     notifier_problem: Option<notifier::Problem>,
+    /// The sounds still to come in this session.
+    plan: Option<Plan>,
+    muted: bool,
+    sound_problem: Option<player::Problem>,
+    random: fastrand::Rng,
 }
 
 impl App {
@@ -92,6 +111,10 @@ impl App {
             catalog,
             last_notification: 0,
             notifier_problem: None,
+            plan: None,
+            muted: options.settings_file.as_deref().is_some_and(settings::muted),
+            sound_problem: None,
+            random: fastrand::Rng::new(),
             options,
         };
         // The idle window has weather too, until the first session rolls its own.
@@ -167,6 +190,52 @@ impl App {
         vec![Event::NotifierProblem]
     }
 
+    /// Whether the sounds are muted. Their pictures show either way.
+    pub fn muted(&self) -> bool {
+        self.muted
+    }
+
+    /// Mutes or unmutes the sounds, and remembers the choice.
+    pub fn set_muted(&mut self, muted: bool) -> Vec<Event> {
+        if muted == self.muted {
+            return Vec::new();
+        }
+        self.muted = muted;
+        if let Some(file) = &self.options.settings_file {
+            settings::remember_muted(file, muted);
+        }
+        vec![Event::Muted]
+    }
+
+    /// How loud a sound is played, from 0 to 1.
+    pub fn volume(&self, kind: sounds::Kind) -> f64 {
+        kind.volume() * self.options.sound_volume
+    }
+
+    /// `None` when the sounds can be heard, otherwise why they cannot.
+    pub fn sound_problem(&self) -> Option<player::Problem> {
+        self.sound_problem
+    }
+
+    /// Takes what the player said of a sound: that it plays, or why not.
+    pub fn sound_reported(&mut self, report: player::Report) -> Vec<Event> {
+        let problem = match report {
+            player::Report::Started(_) => None,
+            player::Report::Failed(_, problem) | player::Report::Broke(problem) => Some(problem),
+            player::Report::Muted(_) => return Vec::new(),
+        };
+        if problem == self.sound_problem {
+            return Vec::new();
+        }
+        self.sound_problem = problem;
+        vec![Event::SoundProblem]
+    }
+
+    /// The part of the day, as far as the sounds care.
+    fn period(&self) -> Period {
+        Period::of(self.sky.sun_up, self.sky.ambient)
+    }
+
     /// Starts a session growing the plant of `seed`, unless one is growing.
     pub fn start(&mut self, seed: i32) -> Vec<Event> {
         let changes = self.session.start(seed);
@@ -182,7 +251,21 @@ impl App {
     /// Advances the session clock by real time that has passed.
     pub fn advance(&mut self, milliseconds: i64) -> Vec<Event> {
         let changes = self.session.advance(milliseconds);
-        self.session_changed(changes)
+        let mut events = Vec::new();
+        // A sound due by now starts, if the sky still suits it: a plane
+        // needs weather it can be seen and heard in.
+        let now = self.weather.now();
+        let flight_weather = now.rain < 0.25 && now.snow < 0.25 && now.fog < 0.35;
+        let (elapsed, period) = (self.session.elapsed_seconds(), self.period());
+        if let Some(kind) = self
+            .plan
+            .as_mut()
+            .and_then(|plan| plan.due(elapsed, period, flight_weather))
+        {
+            events.push(Event::Sound(kind));
+        }
+        events.extend(self.session_changed(changes));
+        events
     }
 
     /// Reads the clock again for the sky, unless the sky is frozen.
@@ -236,6 +319,18 @@ impl App {
             events.push(Event::Growth);
         }
         if changes.state {
+            // The distant sounds belong to a growing plant: any of the last
+            // session end with it, and a new session plans its own.
+            events.push(Event::SoundsEnded);
+            self.plan = None;
+            if self.session.state() == State::Growing {
+                let seconds = f64::from(self.session.seconds());
+                let period = self.period();
+                self.plan = Plan::roll(&mut self.random, self.options.sound_test, period, seconds);
+                if let Some(plan) = &self.plan {
+                    events.push(Event::SoundComing(plan.kind()));
+                }
+            }
             self.keep_plant(&mut events);
         }
         events
@@ -321,6 +416,9 @@ mod tests {
             catalogs: crate::language::Catalogs::BuiltIn,
             omarchy_path: None,
             notification_service: "org.grove.NoSuchService".into(),
+            sound_test: None,
+            sound_volume: 1.0,
+            settings_file: None,
         }
     }
 
@@ -419,6 +517,113 @@ mod tests {
     }
 
     #[test]
+    fn a_plane_flies_over_a_day_session_and_a_train_passes_at_night() {
+        // The options fix noon in June, in rain, which grounds planes unless
+        // one is asked for by name.
+        let mut asked = App::with_garden(
+            Options {
+                sound_test: Some(sounds::Kind::Plane),
+                ..options(60)
+            },
+            nowhere(),
+        );
+        assert!(asked.start(7).contains(&Event::SoundComing(sounds::Kind::Plane)));
+        assert!(!asked.advance(2900).contains(&Event::Sound(sounds::Kind::Plane)));
+        assert!(asked.advance(200).contains(&Event::Sound(sounds::Kind::Plane)));
+        assert!(!asked.advance(5000).contains(&Event::Sound(sounds::Kind::Plane)));
+
+        let night = Options {
+            time: NaiveTime::from_hms_opt(1, 0, 0),
+            ..options(25 * 60)
+        };
+        let mut app = App::with_garden(night, nowhere());
+        // Every night session has at least one train.
+        assert!(app.start(7).contains(&Event::SoundComing(sounds::Kind::Train)));
+        let mut trains = 0;
+        for _ in 0..(25 * 60 - 1) {
+            trains += app
+                .advance(1000)
+                .iter()
+                .filter(|event| **event == Event::Sound(sounds::Kind::Train))
+                .count();
+        }
+        assert!((1..=3).contains(&trains), "{trains} trains");
+    }
+
+    #[test]
+    fn a_session_that_ends_takes_its_sounds_with_it() {
+        let mut app = App::with_garden(
+            Options {
+                sound_test: Some(sounds::Kind::Train),
+                ..options(60)
+            },
+            nowhere(),
+        );
+        app.start(7);
+        assert!(app.give_up().contains(&Event::SoundsEnded));
+        // The train due three seconds in never comes.
+        assert_eq!(app.advance(5000), vec![]);
+        // A new session ends whatever was left of the old before planning its own.
+        let events = app.start(8);
+        let ended = events.iter().position(|event| *event == Event::SoundsEnded).unwrap();
+        let coming = events
+            .iter()
+            .position(|event| *event == Event::SoundComing(sounds::Kind::Train))
+            .unwrap();
+        assert!(ended < coming);
+    }
+
+    #[test]
+    fn muting_is_remembered_between_runs() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let remembering = || Options {
+            settings_file: Some(dir.path().join("grove.conf")),
+            ..options(10)
+        };
+        let mut first = App::with_garden(remembering(), nowhere());
+        assert!(!first.muted());
+        assert_eq!(first.set_muted(true), vec![Event::Muted]);
+        assert_eq!(first.set_muted(true), vec![]);
+        assert!(App::with_garden(remembering(), nowhere()).muted());
+        // Without a settings file the choice is only for this run.
+        let mut forgetful = app(10);
+        forgetful.set_muted(true);
+        assert!(forgetful.muted());
+    }
+
+    #[test]
+    fn a_sound_problem_is_told_when_it_comes_and_goes() {
+        use player::{Problem, Report};
+        let mut app = app(10);
+        let plane = sounds::Kind::Plane;
+        assert_eq!(
+            app.sound_reported(Report::Failed(plane, Problem::NoOutput)),
+            vec![Event::SoundProblem]
+        );
+        assert_eq!(app.sound_reported(Report::Muted(plane)), vec![]);
+        assert_eq!(app.sound_problem(), Some(Problem::NoOutput));
+        assert_eq!(app.sound_reported(Report::Started(plane)), vec![Event::SoundProblem]);
+        assert_eq!(app.sound_problem(), None);
+        assert_eq!(
+            app.sound_reported(Report::Broke(Problem::Unusable)),
+            vec![Event::SoundProblem]
+        );
+    }
+
+    #[test]
+    fn the_volume_can_be_scaled_down_to_nothing() {
+        let quiet = App::with_garden(
+            Options {
+                sound_volume: 0.5,
+                ..options(10)
+            },
+            nowhere(),
+        );
+        assert_eq!(quiet.volume(sounds::Kind::Train), 0.225);
+        assert_eq!(app(10).volume(sounds::Kind::Plane), 0.3);
+    }
+
+    #[test]
     fn a_date_alone_fixes_the_season() {
         let app = App::with_garden(
             Options {
@@ -436,7 +641,13 @@ mod tests {
         let events = app.start(7);
         assert_eq!(
             events,
-            vec![Event::State, Event::Progress, Event::Weather, Event::Growth]
+            vec![
+                Event::State,
+                Event::Progress,
+                Event::Weather,
+                Event::Growth,
+                Event::SoundsEnded
+            ]
         );
         assert_eq!(app.weather().kind(), Kind::Rain);
         assert_eq!(app.weather().growth(), 0.0);
@@ -515,7 +726,7 @@ mod tests {
         let mut app = app(10);
         app.start(7);
         app.advance(4000);
-        assert_eq!(app.give_up(), vec![Event::State]);
+        assert_eq!(app.give_up(), vec![Event::State, Event::SoundsEnded]);
         let grown = app.weather().growth();
         assert_eq!(app.advance(4000), vec![]);
         assert_eq!(app.weather().growth(), grown);

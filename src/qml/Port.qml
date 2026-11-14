@@ -49,6 +49,20 @@ QtObject {
         target: Notifier
         function onProblemChanged() { console.log("notifier problem:", Notifier.problem) }
     }
+    property Connections sounds: Connections {
+        target: Sounds
+        function onPlaneFlyover(direction, milliseconds, altitude) {
+            console.log("plane", Math.abs(direction), milliseconds, altitude >= 0 && altitude <= 1)
+        }
+        function onTrainPassing(milliseconds) { console.log("train", milliseconds) }
+        function onFadingOut() { console.log("sounds fading out") }
+        function onMutedChanged() { console.log("muted", Sounds.muted) }
+        function onProblemChanged() { console.log("sound problem:", Sounds.problem) }
+    }
+    property Timer mute: Timer {
+        interval: 4500; running: Qt.application.arguments.indexOf("--mute-midway") >= 0
+        onTriggered: Sounds.muted = !Sounds.muted
+    }
     property Connections theme: Connections {
         target: Theme
         function onChanged() { console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius) }
@@ -64,6 +78,7 @@ QtObject {
     Component.onCompleted: {
         console.log("language", Translator.language, "rtl", Translator.rightToLeft, port.said)
         console.log("notifier problem:", Notifier.problem)
+        console.log("muted", Sounds.muted, "sound problem:", Sounds.problem)
         console.log("theme", Theme.accent, Theme.accentForeground, "radius", Theme.radius)
         console.log("garden", Garden.grown, "grown", Garden.wilted, "wilted", "problem:", Garden.problem)
         console.log("state", Backend.state, "seconds", Backend.seconds, "remaining", Backend.remaining)

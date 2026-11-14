@@ -9,8 +9,12 @@ mod language;
 mod light;
 mod notifier;
 mod options;
+mod player;
 mod qml;
 mod session;
+mod settings;
+mod sounds;
+mod synth;
 mod theme;
 mod weather;
 

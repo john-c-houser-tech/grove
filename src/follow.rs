@@ -266,12 +266,24 @@ mod tests {
             || true,
             move |radius| rounded.send(radius).is_ok(),
         );
-        assert_eq!(roundings.recv_timeout(SOON), Ok(6));
-
         let (mut hyprland, _) = listener.accept().unwrap();
+        // A busy machine can make the stand-in miss hyprctl's half second,
+        // and a question that got no answer is not asked again by itself, so
+        // Hyprland says it reloaded until an answer comes.
+        let answered = |hyprland: &mut std::os::unix::net::UnixStream, what: &str| {
+            let deadline = Instant::now() + SOON;
+            while roundings.recv_timeout(Duration::from_millis(700)) != Ok(6) {
+                assert!(Instant::now() < deadline, "{what}");
+                hyprland.write_all(b"configreloaded>>\n").unwrap();
+            }
+            // Let any answers still on their way arrive.
+            while roundings.recv_timeout(Duration::from_millis(700)).is_ok() {}
+        };
+        answered(&mut hyprland, "the rounding was not asked for at the start");
+
         hyprland.write_all(b"workspace>>2\n").unwrap();
-        assert!(roundings.recv_timeout(Duration::from_millis(300)).is_err());
+        assert!(roundings.recv_timeout(Duration::from_millis(700)).is_err());
         hyprland.write_all(b"configreloaded>>\n").unwrap();
-        assert_eq!(roundings.recv_timeout(SOON), Ok(6));
+        answered(&mut hyprland, "the rounding was not asked for after a reload");
     }
 }

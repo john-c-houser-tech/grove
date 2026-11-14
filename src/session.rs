@@ -78,6 +78,11 @@ impl Session {
         ((left + 999) / 1000) as i32
     }
 
+    /// How long the session has run, in seconds.
+    pub fn elapsed_seconds(&self) -> f64 {
+        self.elapsed_ms as f64 / 1000.0
+    }
+
     /// The session's full length.
     pub fn minutes(&self) -> i32 {
         self.seconds / 60
