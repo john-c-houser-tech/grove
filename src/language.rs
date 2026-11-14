@@ -143,7 +143,11 @@ pub fn code_in(text: &str) -> &str {
 
 /// The language code in the language file; English if there is no file.
 pub fn read_code(file: &Path) -> String {
-    fs::read_to_string(file).map_or_else(|_| "en".to_string(), |text| code_in(&text).to_string())
+    // Only the first line need be text.
+    fs::read(file).map_or_else(
+        |_| "en".to_string(),
+        |text| code_in(&String::from_utf8_lossy(&text)).to_string(),
+    )
 }
 
 /// What to watch to hear of a change of language: the file and its
@@ -233,6 +237,14 @@ mod tests {
         assert_eq!(read_code(&dir.path().join("language")), "en");
         let catalog = Catalog::load("en", &Catalogs::Directory(dir.path().to_path_buf()));
         assert_eq!(catalog.translate("Quit", None), None);
+    }
+
+    #[test]
+    fn the_code_is_read_from_a_file_that_is_not_all_text() {
+        let dir = TempDir::new().unwrap();
+        let file = dir.path().join("language");
+        fs::write(&file, b"de\n\xff\xfe\n").unwrap();
+        assert_eq!(read_code(&file), "de");
     }
 
     #[test]

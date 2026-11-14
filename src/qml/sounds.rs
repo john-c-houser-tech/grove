@@ -62,6 +62,7 @@ use cxx_qt_lib::QString;
 use super::shared::{self, tr};
 use crate::app::Event;
 use crate::player::{Player, Problem, Report};
+use crate::session::State;
 use crate::sounds::Kind;
 
 /// What the `Sounds` QObject keeps: the player, whose thread ends with it.
@@ -138,12 +139,16 @@ impl qobject::Sounds {
     }
 
     /// Takes the player's word on a sound: whether or not it can be heard,
-    /// what goes with it is shown, starting together with it.
+    /// what goes with it is shown, starting together with it. A sound whose
+    /// session ended while its output was being opened is too late for
+    /// both: it is faded out, and nothing crosses the idle window.
     fn reported(self: Pin<&mut Self>, report: Report) {
         shared::update(|app| app.sound_reported(report));
+        let growing = shared::read(|app| app.session().state()) == State::Growing;
         match report {
-            Report::Started(kind) | Report::Failed(kind, _) | Report::Muted(kind) => self.show(kind),
-            Report::Broke(_) => {}
+            Report::Started(kind) | Report::Failed(kind, _) | Report::Muted(kind) if growing => self.show(kind),
+            Report::Started(_) => self.as_ref().with_player(Player::end_session),
+            Report::Failed(..) | Report::Muted(_) | Report::Broke(_) => {}
         }
     }
 

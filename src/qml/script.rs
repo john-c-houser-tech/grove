@@ -90,7 +90,7 @@ pub unsafe fn evaluate(object: *mut cxx_qt::QObject, script: &str) -> Option<QVa
 }
 
 /// Starts the services that live in QML singletons, whatever the window's
-/// QML happens to mention: naming a singleton has the engine make it. A
+/// QML happens to mention: reading from a singleton has the engine make it. A
 /// window that never reads `Notifier.problem` still gets its notification.
 /// Returns the services that could not be started, which is none unless the
 /// window does without the Grove module.
@@ -98,8 +98,13 @@ pub unsafe fn evaluate(object: *mut cxx_qt::QObject, script: &str) -> Option<QVa
 /// # Safety
 /// `window` must be the live root object of a loaded window.
 pub unsafe fn start_services(window: *mut cxx_qt::QObject) -> Vec<&'static str> {
-    let named = shared::SERVICES.join(", ");
+    // Reading a property is what has the engine make a singleton; its name
+    // alone does not. Every QObject has an objectName to read.
+    let read: Vec<String> = shared::SERVICES
+        .iter()
+        .map(|service| format!("{service}.objectName"))
+        .collect();
     // SAFETY: passed on as received.
-    let _ = unsafe { evaluate(window, &format!("[{named}].length")) };
+    let _ = unsafe { evaluate(window, &format!("[{}].length", read.join(", "))) };
     shared::missing()
 }

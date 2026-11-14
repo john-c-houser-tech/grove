@@ -97,6 +97,8 @@ pub struct Garden {
     /// A file that could not be read is left exactly as it is, so nothing is
     /// saved over it.
     read_only: bool,
+    /// How long to wait for another Grove to finish saving.
+    lock_wait: Duration,
 }
 
 impl Garden {
@@ -107,6 +109,7 @@ impl Garden {
             plants: Vec::new(),
             problem: None,
             read_only: false,
+            lock_wait: LOCK_WAIT,
         };
         match garden.read() {
             Read::Missing => {}
@@ -130,6 +133,7 @@ impl Garden {
             plants: Vec::new(),
             problem: None,
             read_only: true,
+            lock_wait: LOCK_WAIT,
         }
     }
 
@@ -177,7 +181,10 @@ impl Garden {
     /// is still shown; `problem()` says why it was not kept.
     pub fn record(&mut self, plant: Plant) -> Change {
         if self.read_only {
-            return self.keep_unsaved(plant, None);
+            // A garden with nowhere to be kept says so; one whose file could
+            // not be read has said why already.
+            let problem = self.path.as_os_str().is_empty().then_some(Problem::NoFolder);
+            return self.keep_unsaved(plant, problem);
         }
         let folder = self.path.parent().unwrap_or(Path::new("."));
         if fs::create_dir_all(folder).is_err() {
@@ -186,7 +193,7 @@ impl Garden {
         // Only one Grove saves at a time, and each starts from the file as it
         // is now, so neither drops the plants the other has saved since it
         // was read.
-        let Some(_lock) = Lock::take(&self.lock_path(), LOCK_WAIT) else {
+        let Some(_lock) = Lock::take(&self.lock_path(), self.lock_wait) else {
             return self.keep_unsaved(plant, Some(Problem::Busy));
         };
         let mut plants = match self.read() {
@@ -243,16 +250,24 @@ impl Garden {
         // Oldest first on disk, so a new plant is a simple append in the file.
         let plants: Vec<Value> = self.plants.iter().rev().map(plant_to).collect();
         let text = serde_json::to_vec_pretty(&json!({ "version": 1, "plants": plants }))?;
-        let mut beside = self.path.clone().into_os_string();
+        // The file itself, if the garden is a link to one kept elsewhere
+        // (dotfiles, a synced folder): the link stays, and what it points at
+        // is what is replaced.
+        let target = fs::canonicalize(&self.path).unwrap_or_else(|_| self.path.clone());
+        let mut beside = target.clone().into_os_string();
         beside.push(format!(".{}.tmp", std::process::id()));
         let beside = PathBuf::from(beside);
         let written = File::create(&beside)
             .and_then(|mut file| {
+                // A garden kept private stays private.
+                if let Ok(old) = fs::metadata(&target) {
+                    file.set_permissions(old.permissions())?;
+                }
                 file.write_all(&text)?;
                 file.write_all(b"\n")?;
                 file.sync_all()
             })
-            .and_then(|()| fs::rename(&beside, &self.path));
+            .and_then(|()| fs::rename(&beside, &target));
         if written.is_err() {
             let _ = fs::remove_file(&beside);
         }
@@ -500,9 +515,37 @@ mod tests {
     fn a_busy_garden_keeps_the_plant_unsaved() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("garden.json");
-        let garden = Garden::open(&path);
-        let _held = Lock::take(&garden.lock_path(), Duration::ZERO).unwrap();
-        assert!(Lock::take(&garden.lock_path(), Duration::from_millis(120)).is_none());
+        let mut garden = Garden::open(&path);
+        garden.lock_wait = Duration::from_millis(120);
+        let held = Lock::take(&garden.lock_path(), Duration::ZERO).unwrap();
+        assert_eq!(garden.record(plant(5, Outcome::Done, 1.0, 25)), Change::Inserted);
+        assert_eq!(garden.problem(), Some(&Problem::Busy));
+        // The plant is shown, though it was not saved.
+        assert_eq!(seeds(&garden), [5]);
+        assert!(!path.exists());
+        drop(held);
+        // Once the other Grove is done, the next plant is saved.
+        assert_eq!(garden.record(plant(6, Outcome::Done, 1.0, 25)), Change::Reset);
+        assert_eq!(garden.problem(), None);
+        assert_eq!(seeds(&Garden::open(&path)), [6]);
+    }
+
+    #[test]
+    fn a_garden_that_is_a_link_stays_a_link_and_keeps_its_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = TempDir::new().unwrap();
+        let (kept, link) = (dir.path().join("synced/garden.json"), dir.path().join("garden.json"));
+        fs::create_dir(dir.path().join("synced")).unwrap();
+        fs::write(&kept, r#"{"version":1,"plants":[]}"#).unwrap();
+        fs::set_permissions(&kept, fs::Permissions::from_mode(0o600)).unwrap();
+        std::os::unix::fs::symlink(&kept, &link).unwrap();
+
+        let mut garden = Garden::open(&link);
+        garden.record(plant(5, Outcome::Done, 1.0, 25));
+        assert_eq!(garden.problem(), None);
+        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert_eq!(seeds(&Garden::open(&kept)), [5]);
+        assert_eq!(fs::metadata(&kept).unwrap().permissions().mode() & 0o777, 0o600);
     }
 
     #[test]
@@ -516,6 +559,7 @@ mod tests {
         let mut garden = Garden::unkept();
         assert_eq!(garden.record(plant(5, Outcome::Done, 1.0, 25)), Change::Inserted);
         assert_eq!(seeds(&garden), [5]);
-        assert_eq!(garden.problem(), None);
+        // And says so, where the C++ would have found a folder to try.
+        assert_eq!(garden.problem(), Some(&Problem::NoFolder));
     }
 }

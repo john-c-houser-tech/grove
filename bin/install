@@ -2,6 +2,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-"$ROOT/bin/build"
+# makepkg builds it, with the packager's own flags; building it here first
+# would only build it twice.
 cd "$ROOT/pkgbuild"
 exec makepkg -fsi "$@"

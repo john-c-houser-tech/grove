@@ -84,7 +84,7 @@ impl Options {
     pub fn from_variables(variable: impl Fn(&str) -> Option<String>) -> Self {
         let mut options = Self::default();
         // GROVE_SECONDS shortens a session so the growth can be watched quickly.
-        if let Some(seconds) = variable("GROVE_SECONDS").and_then(|v| v.parse::<i32>().ok()) {
+        if let Some(seconds) = variable("GROVE_SECONDS").and_then(|v| v.trim().parse::<i32>().ok()) {
             if seconds > 0 {
                 options.seconds = seconds;
             }
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn the_variables_are_read() {
         let options = from(&[
-            ("GROVE_SECONDS", "30"),
+            ("GROVE_SECONDS", " 30 "),
             ("GROVE_TIME", "17:05"),
             ("GROVE_DATE", "2026-10-20"),
             ("GROVE_WEATHER", "fog"),

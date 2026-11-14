@@ -2,7 +2,8 @@
 # The memory gate, in two parts:
 #
 # 1. The tests, unmodified, under Valgrind: the unit tests of everything
-#    that touches Qt (src/qml/, where the unsafe code is), and the whole app
+#    that touches Qt (src/qml/, where the unsafe code that touches Qt is),
+#    and the whole app
 #    driven offscreen by the scene tests. Any definite or indirect leak or
 #    memory error fails. The scene tests draw with Qt's software renderer
 #    here, because under Valgrind the GPU driver is slow and reports noise of
@@ -40,14 +41,23 @@ unset QT_QPA_PLATFORMTHEME QT_IM_MODULE QT_STYLE_OVERRIDE
 export QT_QPA_PLATFORM=offscreen
 
 # The test program cargo builds for a target, by the line cargo names it on.
-program() {
-    cargo test --locked --no-run "$@" 2>&1 | sed -n 's/.*Executable .*(\(.*\))$/\1/p' | tail -1
-}
-unit="$(program --lib)"
-scene="$(program --test scene)"
-[ -x "$unit" ] && [ -x "$scene" ] || { echo "the test programs were not built"; exit 1; }
 logs="$ROOT/target/check-leaks"
 mkdir -p "$logs"
+program() {
+    if ! cargo test --locked --no-run "$@" >"$logs/build.log" 2>&1; then
+        cat "$logs/build.log" >&2
+        return 1
+    fi
+    sed -n 's/.*Executable .*(\(.*\))$/\1/p' "$logs/build.log" | tail -1
+}
+unit="$(program --lib)" || { echo "the unit tests were not built"; exit 1; }
+scene="$(program --test scene)" || { echo "the scene tests were not built"; exit 1; }
+[ -x "$unit" ] && [ -x "$scene" ] || { echo "the test programs were not found"; exit 1; }
+
+# A run that ran no tests has checked nothing, whatever it exits with.
+ran() {
+    grep -qE "$1" "$2" || { echo "$3: no tests ran, so nothing was checked"; exit 1; }
+}
 
 # Runs a test program under Valgrind. $1 names the run; the rest is the
 # program and its arguments.
@@ -81,6 +91,7 @@ if [ "$canary" = 1 ]; then
 else
     failed=0
     if memcheck unit "$unit" --test-threads=1 qml::; then
+        ran '^test result: ok\. [1-9]' "$logs/unit.tests" "valgrind, unit tests of src/qml"
         echo "valgrind, unit tests of src/qml: $(grep -E '^test result' "$logs/unit.tests")"
     else
         failed=1
@@ -88,6 +99,7 @@ else
         grep -E "^test result|FAILED|panicked" "$logs/unit.tests" || echo "valgrind, unit tests: did not finish"
     fi
     if QT_QUICK_BACKEND=software memcheck scene "$scene"; then
+        ran '^scene tests: [1-9]' "$logs/scene.tests" "valgrind, scene tests"
         echo "valgrind, $(grep -E '^scene tests' "$logs/scene.tests")"
     else
         failed=1
@@ -107,6 +119,7 @@ if [ "$canary" = 1 ]; then
     exit 0
 fi
 if GROVE_SOAK=1 "$scene" soak >"$logs/soak.tests" 2>&1; then
+    ran '^scene tests: 3 passed' "$logs/soak.tests" "soak"
     grep -E "heap grew" "$logs/soak.tests" | sed 's/^/soak: /'
 else
     failed=1

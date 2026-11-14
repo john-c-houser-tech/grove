@@ -151,7 +151,7 @@ impl qobject::Translator {
     }
 
     pub fn locale(&self) -> QString {
-        QString::from(shared::read(|app| app.format_locale()).as_str())
+        QString::from(shared::read(|app| app.format_locale().to_string()).as_str())
     }
 
     pub fn right_to_left(&self) -> bool {

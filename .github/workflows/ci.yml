@@ -39,7 +39,7 @@ jobs:
           echo 'Server = https://stable-mirror.omarchy.org/$repo/os/$arch' > /etc/pacman.d/mirrorlist
           pacman -Sy --noconfirm archlinux-keyring
           pacman -Suu --noconfirm --needed git base-devel rust cargo-audit python mesa ttf-dejavu \
-            qt6-base qt6-declarative alsa-lib xorg-server-xvfb xorg-xauth
+            qt6-base qt6-declarative alsa-lib dbus xorg-server-xvfb xorg-xauth
           pacman -Q qt6-base qt6-declarative rust cargo-audit mesa
       - uses: actions/checkout@v7
         with:
@@ -55,8 +55,10 @@ jobs:
       # bin/test runs offscreen, as on a desktop; offscreen Qt takes its OpenGL
       # from an X display when there is one, so a virtual one (Mesa's software
       # renderer) lets the scene tests draw. Without it they abort.
+      # A session bus of the tests' own, so the notification test has a
+      # service to talk to.
       - name: Tests
-        run: su ci -c "cd '$GITHUB_WORKSPACE' && xvfb-run -a bin/test"
+        run: su ci -c "cd '$GITHUB_WORKSPACE' && dbus-run-session -- xvfb-run -a bin/test"
 
   # The one check main's ruleset requires.
   result:

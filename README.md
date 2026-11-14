@@ -54,7 +54,7 @@ Grove then appears in the launcher (Super + Space). To just run it:
 `bin/build && build/grove`.
 
 It needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `alsa-lib` to run,
-and Rust (`cargo`) and a C++ compiler to build: Grove is written in Rust, and
+and Rust (`cargo`), a C++ compiler and `pkgconf` to build: Grove is written in Rust, and
 the bridge to Qt compiles C++ of its own.
 
 ## Languages

@@ -5,6 +5,8 @@
 //! is on the GPU the copy here is let go.
 
 use core::pin::Pin;
+use std::sync::{Condvar, Mutex};
+use std::time::Duration;
 
 use cxx::UniquePtr;
 use cxx_qt::Threading;
@@ -128,6 +130,36 @@ pub trait Layer: Threading + Sized + 'static {
     fn painting(&self) -> Painting;
 }
 
+/// How many drawings are under way on their own threads.
+static DRAWING: (Mutex<usize>, Condvar) = (Mutex::new(0), Condvar::new());
+
+/// One drawing under way, counted for as long as this lives.
+struct Drawing;
+
+impl Drawing {
+    fn begin() -> Self {
+        *DRAWING.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) += 1;
+        Self
+    }
+}
+
+impl Drop for Drawing {
+    fn drop(&mut self) {
+        *DRAWING.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) -= 1;
+        DRAWING.1.notify_all();
+    }
+}
+
+/// Waits for the drawings under way to finish, for up to `limit`. Called
+/// when the window has gone and before the application does: a thread still
+/// inside Qt's painter while Qt takes itself down could crash the exit.
+pub fn wait_for_drawings(limit: Duration) {
+    let under_way = DRAWING.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _ = DRAWING
+        .1
+        .wait_timeout_while(under_way, limit, |under_way| *under_way > 0);
+}
+
 /// Sets a new layer up as an item with something to show.
 pub fn initialize<L: Layer>(layer: Pin<&mut L>) {
     layer.item_mut().set_flag(Flag::HAS_CONTENTS, true);
@@ -164,7 +196,9 @@ fn render<L: Layer>(mut layer: Pin<&mut L>) {
     // The thread gets everything by value and hands its picture back to the
     // GUI thread; an item destroyed meanwhile simply never sees it.
     let gui = layer.qt_thread();
+    let drawing = Drawing::begin();
     std::thread::spawn(move || {
+        let _drawing = drawing;
         let picture = draw(painting, width, height, covered_from, ratio);
         let _ = gui.queue(move |layer| finished(layer, picture));
     });
@@ -309,6 +343,25 @@ mod tests {
         assert_eq!(picture.top, 30.0);
         assert_eq!((picture.image.width(), picture.image.height()), (200, 40));
         assert_eq!(picture.image.device_pixel_ratio(), 2.0);
+    }
+
+    #[test]
+    fn drawings_under_way_are_waited_for() {
+        let drawing = Drawing::begin();
+        let started = std::time::Instant::now();
+        let finishing = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            drop(drawing);
+        });
+        wait_for_drawings(Duration::from_secs(20));
+        // Other tests draw nothing through this counter, so the wait was
+        // for this drawing.
+        assert!(started.elapsed() >= Duration::from_millis(150));
+        finishing.join().unwrap();
+        // With nothing under way there is nothing to wait for.
+        let started = std::time::Instant::now();
+        wait_for_drawings(Duration::from_secs(20));
+        assert!(started.elapsed() < Duration::from_secs(5));
     }
 
     #[test]

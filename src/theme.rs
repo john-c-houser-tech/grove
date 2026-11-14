@@ -70,8 +70,9 @@ impl Theme {
         let accent = self
             .directory
             .as_deref()
-            .and_then(|directory| fs::read_to_string(colors_file(directory)).ok())
-            .and_then(|colors| accent_in(&colors))
+            .and_then(|directory| fs::read(colors_file(directory)).ok())
+            // Only the accent's line need be text.
+            .and_then(|colors| accent_in(&String::from_utf8_lossy(&colors)))
             .unwrap_or_else(|| DEFAULT_ACCENT.to_string());
         let changed = accent != self.accent;
         self.accent = accent;
@@ -112,8 +113,9 @@ pub fn accent_in(colors: &str) -> Option<String> {
 /// The rounding in what `hyprctl -j getoption decoration:rounding` printed.
 pub fn rounding_in(output: &[u8]) -> Option<i32> {
     let value: serde_json::Value = serde_json::from_slice(output).ok()?;
-    let rounding = value.get("int")?.as_i64()?;
-    i32::try_from(rounding).ok().filter(|rounding| *rounding >= 0)
+    // A whole number, however it is written: 8 or 8.0.
+    let rounding = value.get("int")?.as_f64()?;
+    (rounding.fract() == 0.0 && (0.0..=f64::from(i32::MAX)).contains(&rounding)).then_some(rounding as i32)
 }
 
 /// What to watch to hear of a change to the theme in `directory`: of the
@@ -176,6 +178,14 @@ mod tests {
     }
 
     #[test]
+    fn the_accent_is_read_from_a_file_that_is_not_all_text() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir(dir.path().join("theme")).unwrap();
+        fs::write(colors_file(dir.path()), b"name = \"\xff\xfe\"\naccent = \"#112233\"\n").unwrap();
+        assert_eq!(Theme::read(Some(dir.path().to_path_buf())).accent(), "#112233");
+    }
+
+    #[test]
     fn the_accent_is_found_among_other_colours() {
         assert_eq!(
             accent_in("background = \"#000000\"\n  accent='#AbCdEf' # mine\n").as_deref(),
@@ -208,6 +218,8 @@ mod tests {
             Some(8)
         );
         assert_eq!(rounding_in(br#"{"int": 0}"#), Some(0));
+        assert_eq!(rounding_in(br#"{"int": 8.0}"#), Some(8));
+        assert_eq!(rounding_in(br#"{"int": 8.5}"#), None);
         assert_eq!(rounding_in(br#"{"int": -1}"#), None);
         assert_eq!(rounding_in(br#"{"float": 8.0}"#), None);
         assert_eq!(rounding_in(b"no such option"), None);

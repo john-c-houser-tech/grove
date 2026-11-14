@@ -52,7 +52,10 @@ pub fn run() -> i32 {
         application.set_application_version(&QString::from(env!("CARGO_PKG_VERSION")));
     }
     // Matches the window to grove.desktop, so the compositor (Wayland app_id)
-    // and the launcher pick up the installed icon.
+    // and the launcher pick up the installed icon. The C++ Grove also set the
+    // window's icon from the icon theme, for window systems that do not go by
+    // the desktop file (X11); an icon cannot be made from Rust without C++,
+    // so there the window has none.
     QGuiApplication::set_desktop_file_name(&QString::from("grove"));
     qml::start(options::Options::from_environment());
     // The controls' style is the process's, and is fixed before the first
@@ -66,7 +69,10 @@ pub fn run() -> i32 {
         return 1;
     };
     let code = application.as_mut().map_or(1, |application| application.exec());
+    // The window goes before the application, and any picture still being
+    // drawn for it is waited for.
     drop(engine);
+    qml::wait_for_drawings();
     code
 }
 

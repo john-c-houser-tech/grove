@@ -55,3 +55,9 @@ pub fn load_window(
     }
     Some(window)
 }
+
+/// Waits, for a few seconds at most, for the layers' drawing threads to
+/// finish. Called once the window has gone and before the application does.
+pub fn wait_for_drawings() {
+    layer::wait_for_drawings(std::time::Duration::from_secs(5));
+}

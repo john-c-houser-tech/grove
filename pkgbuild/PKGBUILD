@@ -6,6 +6,10 @@ arch=('x86_64' 'aarch64')
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'alsa-lib')
 makedepends=('rust' 'gcc' 'pkgconf')
+# The C++ that the bridge to Qt generates is linked by Rust's linker, which
+# cannot read the bytecode GCC leaves in place of code when makepkg asks for
+# link-time optimization.
+options=('!lto')
 source=()
 sha256sums=()
 

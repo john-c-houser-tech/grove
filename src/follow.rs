@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
-use notify::{RecursiveMode, Watcher};
+use notify::{EventKind, RecursiveMode, Watcher};
 
 use crate::theme::{paths_to_watch, rounding_in};
 
@@ -50,6 +50,17 @@ impl Drop for Watching {
 /// themselves once a callback says there is no one left to tell.
 pub struct Following {
     _watching: Option<Watching>,
+    /// Hyprland's event socket, closed when this goes so the thread reading
+    /// it stops, and with it the thread asking for the rounding.
+    events: Option<UnixStream>,
+}
+
+impl Drop for Following {
+    fn drop(&mut self) {
+        if let Some(events) = &self.events {
+            let _ = events.shutdown(std::net::Shutdown::Both);
+        }
+    }
 }
 
 /// Watches the paths `paths` names, and calls `changed`, on a thread of its
@@ -64,8 +75,13 @@ pub fn watch(
     let (tell, told) = mpsc::channel::<News>();
     let from_watcher = tell.clone();
     std::thread::spawn(move || {
-        let Ok(mut watcher) = notify::recommended_watcher(move |_| {
-            let _ = from_watcher.send(News::Changed);
+        let Ok(mut watcher) = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+            // Only what changes a file is news. Opening or reading one is
+            // reported too, and reading the file is what a change makes the
+            // callback do: counted as news, one change would never settle.
+            if event.is_ok_and(|event| !matches!(event.kind, EventKind::Access(_))) {
+                let _ = from_watcher.send(News::Changed);
+            }
         }) else {
             return;
         };
@@ -102,6 +118,7 @@ pub fn follow(
 ) -> Following {
     // Corners follow Hyprland's effective rounding, which themes and personal
     // overrides can both set, so hyprctl is asked rather than its config read.
+    let mut listening = None;
     let ask = hyprland.map(|hyprland| {
         let (ask, asked) = mpsc::channel::<()>();
         let hyprctl = hyprland.hyprctl.clone();
@@ -119,21 +136,24 @@ pub fn follow(
         // Hyprland announces every config reload on its event socket, which
         // covers a theme switch and an edited override alike, so the rounding
         // is asked for then rather than polled.
-        if let Some(events) = hyprland.events {
+        if let Some(socket) = hyprland.events.and_then(|events| UnixStream::connect(events).ok()) {
+            listening = socket.try_clone().ok();
             let ask = ask.clone();
             std::thread::spawn(move || {
-                let Ok(socket) = UnixStream::connect(events) else {
-                    return;
-                };
-                for line in BufReader::new(socket).lines() {
-                    match line {
-                        Ok(line) if line.starts_with("configreloaded>>") => {
+                // Lines are compared as bytes: the socket also carries window
+                // titles, which need not be text this program can decode.
+                let mut reader = BufReader::new(socket);
+                let mut line = Vec::new();
+                loop {
+                    line.clear();
+                    match reader.read_until(b'\n', &mut line) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) if line.starts_with(b"configreloaded>>") => {
                             if ask.send(()).is_err() {
                                 break;
                             }
                         }
                         Ok(_) => {}
-                        Err(_) => break,
                     }
                 }
             });
@@ -153,7 +173,10 @@ pub fn follow(
             },
         )
     });
-    Following { _watching: watching }
+    Following {
+        _watching: watching,
+        events: listening,
+    }
 }
 
 /// Stops watching `watched` and watches `paths`, as far as they can be.
@@ -248,6 +271,70 @@ mod tests {
         while changes.recv_timeout(Duration::from_millis(300)).is_ok() {}
         fs::write(current.join("theme/colors.toml"), "accent = \"#112233\"\n").unwrap();
         changes.recv_timeout(SOON).expect("the new colours were not noticed");
+    }
+
+    #[test]
+    fn reading_the_changed_file_is_not_another_change() {
+        let dir = TempDir::new().unwrap();
+        let file = dir.path().join("colors.toml");
+        fs::write(&file, "accent = \"#112233\"\n").unwrap();
+        let (changed, changes) = mpsc::channel();
+        let (watched, read) = (file.clone(), file.clone());
+        let _watching = watch(
+            move || vec![watched.clone(), watched.parent().unwrap().to_path_buf()],
+            move || {
+                // What every real callback does: read the file that changed.
+                let _ = fs::read_to_string(&read);
+                changed.send(()).is_ok()
+            },
+        );
+        std::thread::sleep(Duration::from_millis(100));
+        fs::write(&file, "accent = \"#445566\"\n").unwrap();
+        changes.recv_timeout(SOON).expect("the change was not noticed");
+        // One change, told once or twice as it settles, and then quiet.
+        let mut more = 0;
+        while changes.recv_timeout(Duration::from_millis(500)).is_ok() {
+            more += 1;
+            assert!(more < 3, "the watcher keeps waking on its own reads");
+        }
+    }
+
+    #[test]
+    fn hyprlands_threads_stop_with_the_following() {
+        let dir = TempDir::new().unwrap();
+        let events = dir.path().join("events.sock");
+        let listener = UnixListener::bind(&events).unwrap();
+        let hyprland = Hyprland {
+            hyprctl: hyprctl(&dir, "echo '{\"int\": 6}'"),
+            events: Some(events),
+        };
+        let (rounded, roundings) = mpsc::channel();
+        let following = follow(
+            None,
+            Some(hyprland),
+            || true,
+            move |radius| rounded.send(radius).is_ok(),
+        );
+        let (mut hyprland, _) = listener.accept().unwrap();
+        // A window title that is not text does not end the listening.
+        hyprland
+            .write_all(b"activewindow>>\xff\xfe broken\nconfigreloaded>>\n")
+            .unwrap();
+        let deadline = Instant::now() + SOON;
+        while roundings.recv_timeout(Duration::from_millis(700)) != Ok(6) {
+            assert!(Instant::now() < deadline, "no rounding was asked for");
+            hyprland.write_all(b"configreloaded>>\n").unwrap();
+        }
+        drop(following);
+        // With the socket closed its reader stops, the asking thread after
+        // it, and the callback that held the sender is dropped.
+        let deadline = Instant::now() + SOON;
+        loop {
+            match roundings.recv_timeout(Duration::from_millis(100)) {
+                Err(RecvTimeoutError::Disconnected) => break,
+                _ => assert!(Instant::now() < deadline, "the threads kept running"),
+            }
+        }
     }
 
     #[test]

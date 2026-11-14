@@ -68,6 +68,8 @@ pub struct App {
     garden: Garden,
     /// The current language's strings, shared with whoever translates.
     catalog: Arc<Catalog>,
+    /// The name of the locale the language is formatted with.
+    format_locale: String,
     /// The id of the last notification sent, which the next replaces, and
     /// why notifications cannot be sent, if they cannot.
     last_notification: u32,
@@ -109,6 +111,7 @@ impl App {
             theme,
             fixed,
             garden,
+            format_locale: language::format_locale(catalog.code(), options.omarchy_path.as_deref()),
             catalog,
             last_notification: 0,
             notifier_problem: None,
@@ -152,9 +155,10 @@ impl App {
         &self.catalog
     }
 
-    /// The name of the locale numbers and dates are formatted with.
-    pub fn format_locale(&self) -> String {
-        language::format_locale(self.catalog.code(), self.options.omarchy_path.as_deref())
+    /// The name of the locale numbers and dates are formatted with: the one
+    /// Omarchy's registry gives the language, read when the language is.
+    pub fn format_locale(&self) -> &str {
+        &self.format_locale
     }
 
     /// Reads the language again, after its file changed. Catalogs do not
@@ -165,6 +169,7 @@ impl App {
             return Vec::new();
         }
         self.catalog = Arc::new(Catalog::load(&code, &self.options.catalogs));
+        self.format_locale = language::format_locale(&code, self.options.omarchy_path.as_deref());
         vec![Event::Language]
     }
 

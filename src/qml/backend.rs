@@ -55,7 +55,7 @@ pub mod qobject {
 }
 
 use core::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -167,13 +167,20 @@ impl qobject::Backend {
         let counter = Arc::clone(&self.rust().ticker);
         let session = counter.fetch_add(1, Ordering::SeqCst) + 1;
         let gui = self.qt_thread();
+        // A tick still waiting for the GUI thread is not joined by another:
+        // each takes its time from the clock, so one is enough.
+        let waiting = Arc::new(AtomicBool::new(false));
         std::thread::spawn(move || loop {
             std::thread::sleep(TICK);
             if counter.load(Ordering::SeqCst) != session {
                 break;
             }
-            let counter = Arc::clone(&counter);
+            if waiting.swap(true, Ordering::SeqCst) {
+                continue;
+            }
+            let (counter, waiting) = (Arc::clone(&counter), Arc::clone(&waiting));
             let queued = gui.queue(move |backend| {
+                waiting.store(false, Ordering::SeqCst);
                 // A tick queued before the session ended is not for the next.
                 if counter.load(Ordering::SeqCst) == session {
                     backend.tick();

@@ -40,7 +40,8 @@ fn main() {
     // them.
     .qrc_resources(["src/images/rain.png", "src/images/snow.png"])
     .qt_module("Quick")
-    // Only for a header: the scene tests send keys the way Qt's own tests do.
+    // For a header only: the scene tests send keys the way Qt's own tests
+    // do. Nothing of Qt's test library is called, so it is not linked.
     .qt_module("Test")
     .build();
 }

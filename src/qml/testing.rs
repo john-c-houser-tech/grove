@@ -300,6 +300,7 @@ impl Drop for Scene {
         // go too.
         self.scripts.borrow_mut().clear();
         self.engine = UniquePtr::null();
+        super::wait_for_drawings();
         wait(50);
     }
 }

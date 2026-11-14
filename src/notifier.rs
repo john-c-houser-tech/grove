@@ -70,7 +70,10 @@ mod tests {
 
     #[interface(name = "org.freedesktop.Notifications")]
     impl Stand {
-        #[allow(clippy::too_many_arguments)]
+        #[expect(
+            clippy::too_many_arguments,
+            reason = "the notification service's own Notify takes eight"
+        )]
         fn notify(
             &self,
             app: String,
@@ -92,10 +95,16 @@ mod tests {
         }
     }
 
-    /// Tests that talk to a bus are skipped where there is none, as in a
-    /// bare container; `send` itself reports that as `Problem::NoBus`.
+    /// Tests that talk to a bus are skipped on a desktop with none, where
+    /// `send` itself reports `Problem::NoBus`. CI runs them under a session
+    /// bus of its own, and fails without one: a skipped test checks nothing.
     fn bus_missing() -> bool {
-        zbus::block_on(Connection::session()).is_err()
+        let missing = zbus::block_on(Connection::session()).is_err();
+        assert!(
+            !(missing && std::env::var_os("CI").is_some()),
+            "CI must run the tests under a session bus"
+        );
+        missing
     }
 
     #[test]

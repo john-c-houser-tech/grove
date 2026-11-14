@@ -52,9 +52,11 @@ wrote it:
 
 ## Memory, ownership and unsafe code
 
-1. Unsafe code lives in `src/qml/` only, and every `unsafe` block says, in a
-   `// SAFETY:` comment, why it is sound. The files above `src/qml/` are safe
-   Rust that knows nothing of Qt.
+1. Unsafe code lives in `src/qml/`, and every `unsafe` block says, in a
+   `// SAFETY:` comment, why it is sound; clippy fails one that does not.
+   The rules above `src/qml/` are safe Rust that knows nothing of Qt. The one
+   exception is `src/lib.rs`, which starts the application and makes one
+   call into the allocator.
 2. There is one `App` (`app.rs`), on the GUI thread, behind `qml/shared.rs`.
    The QML singletons own nothing of it: each reads what it shows from there
    and is told what changed. `qml::start` makes it before a window is loaded.
